@@ -29,14 +29,15 @@ impl Input {
     /// use inputbot::Input::{Keybd, Mouse};
     /// use inputbot::KeybdInput::{Press, Release};
     /// use inputbot::MouseInput::{PressLeft, ReleaseLeft};
+    /// use inputbot::vk;
     /// 
     /// // Toggle NumLock
-    /// Keybd(Press, 144);
-    /// Keybd(Release, 144);
+    /// Keybd(Press, vk::W).send();
+    /// Keybd(Release, vk::W).send();
     ///
     /// // Click left mouse button
-    /// Mouse(PressLeft, 0, 0);
-    /// Mouse(ReleaseLeft, 0, 0);
+    /// Mouse(PressLeft, 0, 0).send();
+    /// Mouse(ReleaseLeft, 0, 0).send();
     /// ```
     pub fn send(self) {
         let mut _input: INPUT = match self {
