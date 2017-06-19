@@ -1,0 +1,16 @@
+[package]
+name = "inputbot"
+version = "0.1.0"
+authors = ["obv-mikhail <obv.mikhail@gmail.com>"]
+description = "A library for creating global hotkeys, as well as emulating mouse and keyboard input."
+documentation = "https://docs.rs/inputbot"
+homepage = "https://github.com/obv-mikhail/inputbot"
+repository = "https://github.com/obv-mikhail/inputbot"
+readme = "README.md"
+keywords = ["hotkey", "mouse", "keyboard", "input"]
+categories = ["api-bindings"]
+license = "MIT"
+
+[dependencies]
+winapi = "0.2.8"
+user32-sys = "0.2.0"
