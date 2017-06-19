@@ -1,4 +1,4 @@
-# InputBot [![alt text](https://docs.rs/InputBot/badge.svg)](https://docs.rs/InputBot)
+# InputBot [![alt text](https://img.shields.io/badge/docs-0.1.1-red.svg)](https://obv-mikhail.github.io/doc/inputbot/) [![alt text](https://img.shields.io/crates/v/inputbot.svg)](https://crates.io/crates/inputbot) 
 A very small AutoHotkey inspired library for creating global hotkeys, as well as emulating mouse and keyboard input.
 
 # How-To
@@ -31,4 +31,4 @@ fn main() {
 }
 ```
 
-Check out the examples for more code samples, or read the documentation.
+Check out the [examples](https://github.com/obv-mikhail/InputBot/tree/master/examples) for more code samples, or read the documentation.
