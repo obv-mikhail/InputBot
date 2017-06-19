@@ -2,7 +2,7 @@ extern crate winapi;
 extern crate user32;
 
 use winapi::{MSLLHOOKSTRUCT, MOUSEINPUT, HWND, MSG, INPUT, KEYBDINPUT, c_int, WPARAM, LPARAM, LRESULT, HINSTANCE, HHOOK, KBDLLHOOKSTRUCT};
-use user32::{GetAsyncKeyState, UnhookWindowsHookEx, PostMessageA, GetMessageW, GetKeyState, MapVirtualKeyA, SendInput, SetWindowsHookExA, CallNextHookEx};
+use user32::{GetAsyncKeyState, UnhookWindowsHookEx, PostMessageW, GetMessageW, GetKeyState, MapVirtualKeyW, SendInput, SetWindowsHookExW, CallNextHookEx};
 use std::mem::{transmute, size_of, uninitialized};
 
 pub mod vk;
@@ -45,7 +45,7 @@ impl Input {
                 type_: 1, 
                 u: unsafe{transmute((KEYBDINPUT{
                     wVk: 0,
-                    wScan: MapVirtualKeyA(vk_code as u32, 0) as u16,
+                    wScan: MapVirtualKeyW(vk_code as u32, 0) as u16,
                     dwFlags: match keybd_input {Press => 0x0008, Release => 0x0008 | 0x0002},
                     time: 0,
                     dwExtraInfo: 0
@@ -80,7 +80,7 @@ static mut KEYBD_HHOOK: HHOOK = 0 as HHOOK;
 static mut MOUSE_HHOOK: HHOOK = 0 as HHOOK;
 
 unsafe extern "system" fn hhook_proc(code: c_int, w_param: WPARAM, l_param: LPARAM) -> LRESULT {
-    PostMessageA(0 as HWND, 0, w_param, l_param);
+    PostMessageW(0 as HWND, 0, w_param, l_param);
     CallNextHookEx(KEYBD_HHOOK, code, w_param, l_param)
 }
 
@@ -104,12 +104,15 @@ unsafe extern "system" fn hhook_proc(code: c_int, w_param: WPARAM, l_param: LPAR
 /// Input handling can be done in a new thread if multiple inputs need to be handled simultaneously.
 pub fn capture_input() -> Option<Input> {
     // The function resets hooks during every call to prevent capture emulated input.
-    unsafe{KEYBD_HHOOK = SetWindowsHookExA(13, Some(hhook_proc), 0 as HINSTANCE, 0)};
-    unsafe{MOUSE_HHOOK = SetWindowsHookExA(14, Some(hhook_proc), 0 as HINSTANCE, 0)};
-    let mut msg: MSG = unsafe{uninitialized()};
-    if unsafe {GetMessageW(&mut msg, 0 as HWND, 0, 0)} <= 0 {return None}
-    unsafe{UnhookWindowsHookEx(KEYBD_HHOOK)};
-    unsafe{UnhookWindowsHookEx(MOUSE_HHOOK)};
+    let msg: MSG = unsafe{
+        KEYBD_HHOOK = SetWindowsHookExW(13, Some(hhook_proc), 0 as HINSTANCE, 0);
+        MOUSE_HHOOK = SetWindowsHookExW(14, Some(hhook_proc), 0 as HINSTANCE, 0);
+        let mut msg: MSG = uninitialized();
+        if GetMessageW(&mut msg, 0 as HWND, 0, 0) <= 0 {return None}
+        UnhookWindowsHookEx(KEYBD_HHOOK);
+        UnhookWindowsHookEx(MOUSE_HHOOK);
+        msg
+    };
     // Windows Message Codes can be found here: https://wiki.winehq.org/List_Of_Windows_Messages
     match msg.wParam {
         256 => Some(Keybd(Press, unsafe{*(msg.lParam as *const KBDLLHOOKSTRUCT)}.vkCode as u8)),

@@ -1,6 +1,6 @@
 [package]
 name = "inputbot"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["obv-mikhail <obv.mikhail@gmail.com>"]
 description = "A library for creating global hotkeys, as well as emulating mouse and keyboard input."
 documentation = "https://obv-mikhail.github.io/doc/inputbot/"
