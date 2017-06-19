@@ -1,4 +1,4 @@
-# InputBot [![alt text](https://img.shields.io/badge/docs-0.1.1-red.svg)](https://obv-mikhail.github.io/doc/inputbot/) [![alt text](https://img.shields.io/crates/v/inputbot.svg)](https://crates.io/crates/inputbot) 
+# InputBot [![docs link](https://img.shields.io/badge/docs-0.1.1-red.svg)](https://obv-mikhail.github.io/doc/inputbot/) [![crates.io version](https://img.shields.io/crates/v/inputbot.svg)](https://crates.io/crates/inputbot) 
 A very small AutoHotkey inspired library for creating global hotkeys, as well as emulating mouse and keyboard input.
 
 # How-To
