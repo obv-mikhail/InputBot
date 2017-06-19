@@ -4,7 +4,7 @@ A very small AutoHotkey inspired library for creating global hotkeys, as well as
 # How-To
 Hotkeys can be created by matching input within a capture loop.
 
-The code below demonstrates creates a rapidfire hotkey useful for videogames.
+The code below demonstrates how to create a rapidfire hotkey for videogames.
 
 ```Rust
 extern crate inputbot;
@@ -31,4 +31,4 @@ fn main() {
 }
 ```
 
-Check out the examples for more code samples.
+Check out the examples for more code samples, or read the documentation.
