@@ -1,6 +1,6 @@
 [package]
 name = "inputbot"
-version = "0.1.2"
+version = "0.2.0"
 authors = ["obv-mikhail <obv.mikhail@gmail.com>"]
 description = "A library for creating global hotkeys, as well as emulating mouse and keyboard input."
 documentation = "https://obv-mikhail.github.io/doc/inputbot/"
@@ -14,3 +14,4 @@ license = "MIT"
 [dependencies]
 winapi = "0.2.8"
 user32-sys = "0.2.0"
+lazy_static = "0.2"
