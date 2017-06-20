@@ -12,6 +12,11 @@ categories = ["api-bindings"]
 license = "MIT"
 
 [dependencies]
+lazy_static = "0.2"
+
+[target.'cfg(windows)'.dependencies]
 winapi = "0.2.8"
 user32-sys = "0.2.0"
-lazy_static = "0.2"
+
+[target.'cfg(linux)'.dependencies]
+x11-dl = "2.14.0"
