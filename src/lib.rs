@@ -1,28 +1,42 @@
 #[macro_use]
 extern crate lazy_static;
 
-#[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
-pub enum Hotkey {
-    KeybdHotkey(KeybdHotkeyType, VKCode), 
-    MouseHotkey(MouseHotkeyType)
-}
+use std::sync::{Arc, Mutex};
+use std::collections::hash_map::HashMap;
+
+pub type Code = u8;
 
 #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
-pub enum KeybdHotkeyType {
-    Press,
-    Release
+pub enum Event {
+    KeybdPress(Code),
+    KeybdRelease(Code),
+    MousePressLeft,
+    MouseReleaseLeft,
+    MousePressRight,
+    MouseReleaseRight,
+    MousePressMiddle,
+    MouseReleaseMiddle,
+    MousePressXButton1,
+    MouseReleaseXButton1,
+    MousePressXButton2,
+    MouseReleaseXButton2,
+    MouseScroll,
+    MouseMove
 }
 
-#[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
-pub enum MouseHotkeyType {
-    PressLeft, 
-    ReleaseLeft, 
-    PressRight, 
-    ReleaseRight, 
-    PressMiddle, 
-    ReleaseMiddle, 
-    Move,
-    Scroll
+impl Event {
+    pub fn bind<F>(self, callback: F) where F: 'static + Send + Fn() {
+        HOTKEYS.lock().unwrap().insert(self, Box::new(callback));
+    }
+
+    pub fn unbind(self) {
+        HOTKEYS.lock().unwrap().remove(&self);
+    }
+}
+
+lazy_static! {
+    static ref HOTKEYS: Arc<Mutex<HashMap<Event, Box<Fn() + Send + 'static>>>> = Arc::new(Mutex::new(HashMap::<Event, Box<Fn() + Send + 'static>>::new()));
+    static ref CAPTURE_HOTKEYS: Arc<Mutex<bool>> = Arc::new(Mutex::new(false));
 }
 
 #[cfg(target_os = "windows")]

@@ -1,59 +1,13 @@
-//! # How-To
-//! Hotkeys can be created by matching input within a capture loop.
-//! 
-//! The code below demonstrates how to create a rapidfire hotkey for videogames.
-//! 
-//! ```
-//! extern crate inputbot;
-//! 
-//! use inputbot::*;
-//! use Hotkey::*;
-//! use KeybdHotkeyType::*;
-//! use MouseHotkeyType::*;
-//! use std::time::Duration;
-//! use std::thread::sleep;
-//! 
-//! fn main() {
-//!     register(MouseHotkey(PressRight), || {
-//!         while get_logical_state(vk::RBUTTON) {
-//!             mouse_press_left();
-//!             sleep(Duration::from_millis(50));
-//!             mouse_release_left();
-//!         }
-//!     });
-//!     capture_input();
-//! }
-//! ```
-//! 
-//! Check out the [examples](https://github.com/obv-mikhail/InputBot/tree/master/examples) for more code samples, or read the documentation.
-
 extern crate winapi;
 extern crate user32;
 
 use self::winapi::*;
 use self::user32::*;
-use Hotkey;
+use *;
+use Event::*;
 use std::mem::{transmute_copy, transmute, size_of, uninitialized};
-use std::sync::{Arc, Mutex};
-use std::collections::hash_map::HashMap;
-use std::ops::{FnOnce, FnMut};
-use std::marker::Send;
 
-pub mod vk;
-
-pub type VKCode = u8;
-
-lazy_static! {
-    static ref HOTKEYS: Arc<Mutex<HashMap<Hotkey, Box<FnMut() + Send + 'static>>>> = Arc::new(Mutex::new(HashMap::<Hotkey, Box<FnMut() + Send + 'static>>::new()));
-}
-
-pub fn register<F>(hotkey: Hotkey, callback: F) where for<'r> F: FnOnce() + 'static + Send + FnMut() {
-    HOTKEYS.lock().unwrap().insert(hotkey, Box::new(callback));
-}
-
-pub fn unregister(hotkey: Hotkey) {
-    HOTKEYS.lock().unwrap().remove(&hotkey);
-}
+pub mod codes;
 
 static mut KEYBD_HHOOK: HHOOK = 0 as HHOOK;
 static mut MOUSE_HHOOK: HHOOK = 0 as HHOOK;
@@ -63,11 +17,9 @@ unsafe extern "system" fn hhook_proc(code: c_int, w_param: WPARAM, l_param: LPAR
     CallNextHookEx(KEYBD_HHOOK, code, w_param, l_param)
 }
 
-pub fn capture_input() {
-    use Hotkey::*;
-    use KeybdHotkeyType::*;
-    use MouseHotkeyType::*;
-    loop {
+pub fn start_capture() {
+    *CAPTURE_HOTKEYS.lock().unwrap() = true;
+    while *CAPTURE_HOTKEYS.lock().unwrap() {
         let msg = unsafe {
             KEYBD_HHOOK = SetWindowsHookExW(13, Some(hhook_proc), 0 as HINSTANCE, 0);
             MOUSE_HHOOK = SetWindowsHookExW(14, Some(hhook_proc), 0 as HINSTANCE, 0);
@@ -79,39 +31,37 @@ pub fn capture_input() {
             MOUSE_HHOOK = 0 as HHOOK;
             msg
         };
-        let hotkey = match msg.wParam {
-            256 => KeybdHotkey(Press, unsafe{*(msg.lParam as *const KBDLLHOOKSTRUCT)}.vkCode as u8),
-            257 => KeybdHotkey(Release, unsafe{*(msg.lParam as *const KBDLLHOOKSTRUCT)}.vkCode as u8),
-            512...522 => {
-                MouseHotkey(match msg.wParam {
-                    512 => Move,
-                    513 => PressLeft,
-                    514 => ReleaseLeft,
-                    516 => PressRight,
-                    517 => ReleaseRight,
-                    519 => PressMiddle,
-                    520 => ReleaseMiddle,
-                    522 => Scroll,
-                    _ => Move
-                })
-            },
-            _ => MouseHotkey(Move)
-        };
-        if let Some(func) = HOTKEYS.lock().unwrap().get_mut(&hotkey) {func()}
+        if let Some(hotkey) = match msg.wParam as u32 {
+            WM_KEYDOWN => Some(KeybdPress(unsafe{*(msg.lParam as *const KBDLLHOOKSTRUCT)}.vkCode as u8)),
+            WM_KEYUP => Some(KeybdRelease(unsafe{*(msg.lParam as *const KBDLLHOOKSTRUCT)}.vkCode as u8)),
+            WM_MOUSEMOVE => Some(MouseMove),
+            WM_LBUTTONDOWN => Some(MousePressLeft),
+            WM_LBUTTONUP => Some(MouseReleaseLeft),
+            WM_RBUTTONDOWN => Some(MousePressRight),
+            WM_RBUTTONUP => Some(MouseReleaseRight),
+            WM_MBUTTONDOWN => Some(MousePressMiddle),
+            WM_MBUTTONUP => Some(MouseReleaseMiddle),
+            WM_MOUSEWHEEL => Some(MouseScroll),
+            _ => None
+        } {if let Some(cb) = HOTKEYS.lock().unwrap().get_mut(&hotkey) {cb()}}
     }
+}
+
+pub fn stop_capture() {
+    *CAPTURE_HOTKEYS.lock().unwrap() = false;
 }
 
 fn send_mouse_input(flags: u32, data: u32, dx: i32, dy: i32) {
     let mut input = INPUT {
         type_: INPUT_MOUSE,
-        u: unsafe{transmute(MOUSEINPUT {
+        u: unsafe{transmute_copy(&MOUSEINPUT {
             dx: dx,
             dy: dy,
             mouseData: data,
             dwFlags: flags,
             time: 0,
             dwExtraInfo: 0,
-        })},
+        })}
     };
     unsafe{SendInput(1, &mut input as LPINPUT, size_of::<INPUT>() as c_int)};
 }
@@ -175,20 +125,18 @@ pub fn mouse_scroll_ver(dwheel: i32) {
     send_mouse_input(MOUSEEVENTF_WHEEL, unsafe{transmute(dwheel*120)}, 0, 0);
 }
 
-pub fn keybd_press(vk: VKCode) {
+pub fn keybd_press(vk: Code) {
     send_keybd_input(KEYEVENTF_SCANCODE, vk);
 }
 
-pub fn keybd_release(vk: VKCode) {
+pub fn keybd_release(vk: Code) {
     send_keybd_input(KEYEVENTF_SCANCODE | KEYEVENTF_KEYUP, vk);
 }
 
-/// Teturns the toggle state for NumLock, CapsLock, and ScrollLock.
-pub fn get_toggle_state(vk_code: VKCode) -> bool {
+pub fn is_toggled(vk_code: Code) -> bool {
     unsafe {GetKeyState(vk_code as i32) & 15 != 0}
 }
 
-/// Returns the logical state (pressed | not pressed).
-pub fn get_logical_state(vk_code: VKCode) -> bool {
+pub fn is_pressed(vk_code: Code) -> bool {
     match unsafe {GetAsyncKeyState(vk_code as i32)} {-32767 | -32768 => true, _ => false}
 }
