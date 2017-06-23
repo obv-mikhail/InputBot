@@ -1,121 +1,94 @@
-extern crate x11_dl;
+extern crate x11;
 
-use self::x11_dl::xtest::*;
-use self::x11_dl::xlib::*;
-use self::x11_dl::error::OpenError;
-use Hotkey;
-use std;
+use self::x11::*;
+use self::x11::xlib::*;
+use *;
+use Event::*;
 use std::mem::uninitialized;
 use std::collections::hash_map::HashMap;
-use std::ops::FnMut;
-use std::cell::RefCell;
-use Hotkey::*;
-use KeybdHotkeyType::*;
-use MouseHotkeyType::*;
 
-/// http://wiki.linuxquestions.org/wiki/List_of_keysyms
-pub type VKCode = u8;
+pub mod codes;
 
-thread_local! {
-    static STATE: Result<(
-        Xlib, *mut Display, u64, Xf86vmode,
-        RefCell<HashMap<Hotkey, Box<FnMut() + 'static>>>
-    ), OpenError> = {
-        let xlib = Xlib::open()?;
-        let display = unsafe{(xlib.XOpenDisplay)(std::ptr::null())};
-        let window = unsafe{(xlib.XDefaultRootWindow)(display)};
-        let xf86vmode = Xf86vmode::open()?;
-        Ok((
-            xlib, display, window, xf86vmode, 
-            RefCell::new(HashMap::<Hotkey, Box<FnMut() + 'static>>::new())
-        ))
-    };
+
+#[link(name = "Xtst")]
+extern "C" {
+    fn XTestFakeButtonEvent(display: Display, keycode: KeyCode, state: Bool, delay: u64);
 }
 
-pub fn register<F>(hotkey: Hotkey, callback: F) where F: 'static + FnMut() {
-    STATE.with(|state| if let &Ok((ref xlib, display, window, ref xf86vmode, ref hotkeys)) = state {
-        let hotkey = match &hotkey {
-            &KeybdHotkey(ref type_, scan_code) => {
-                KeybdHotkey(match type_ {&Press => Press, _ => Release},
-                    unsafe{(xlib.XKeysymToKeycode)(display, scan_code as _) as u32} as u8)
+lazy_static! {
+    static ref STATE: Arc<Mutex<(u64, u64)>> = {unsafe{
+        let display = xlib::XOpenDisplay(std::ptr::null());
+        Arc::new(Mutex::new((display as u64, xlib::XDefaultRootWindow(display))))
+    }};
+}
+
+fn get_display() -> *mut Display {
+    STATE.lock().unwrap().0 as *mut Display
+}
+
+fn get_window() -> u64 {
+    STATE.lock().unwrap().1
+}
+
+pub fn start_capture() {
+    loop {
+        for hotkey in HOTKEYS.lock().unwrap().keys() {match hotkey {
+            &KeybdPress(scan_code) | &KeybdRelease(scan_code)  => {
+                unsafe{xlib::XGrabKey
+                (get_display(), scan_code as i32, 0, get_window(), false as i32, GrabModeAsync, GrabModeAsync)};
             },
-            _ => {hotkey}
-        };
-        hotkeys.borrow_mut().insert(hotkey, Box::new(callback));
-    });
-}
-
-pub fn unregister(hotkey: Hotkey) {
-    STATE.with(|state| if let &Ok((ref xlib, display, window, ref xf86vmode, ref hotkeys)) = state {
-        hotkeys.borrow_mut().remove(&hotkey);
-    });
-}
-
-pub fn capture_input() {
-    STATE.with(|state| if let &Ok((ref xlib, display, window, ref xf86vmode, ref hotkeys)) = state {
-        for hotkey in hotkeys.borrow().keys() {match hotkey {
-            &KeybdHotkey(_, scan_code) => {
-                unsafe{(xlib.XGrabKey)
-                (display, scan_code as i32, 0, window, false as i32, GrabModeAsync, GrabModeAsync)};
-            },
-            &MouseHotkey(_) => {} 
+            _ => {} 
         }};
-        loop {
-            let mut ev = unsafe{uninitialized()};
-            unsafe{(xlib.XNextEvent)(display, &mut ev)};
-            let hotkey = match ev.get_type() {
-                KeyPress => {
-                    let ev: &XKeyEvent = ev.as_ref();
-                    KeybdHotkey(Press, ev.keycode as u8)
-                },
-                KeyRelease => {
-                    let ev: &XKeyEvent = ev.as_ref();
-                    KeybdHotkey(Release, ev.keycode as u8)
-                },
-                _ => MouseHotkey(Move)
-            };
-            if let Some(func) = hotkeys.borrow_mut().get_mut(&hotkey) {func()}
-        }
-    });
+        let mut ev = unsafe{uninitialized()};
+        unsafe{xlib::XNextEvent(get_display(), &mut ev)};
+        for hotkey in HOTKEYS.lock().unwrap().keys() {match hotkey {
+            &KeybdPress(scan_code) | &KeybdRelease(scan_code)  => {
+                unsafe{xlib::XUngrabKey
+                (get_display(), scan_code as i32, 0, get_window())};
+            },
+            _ => {} 
+        }};
+        if let Some(hotkey) = match ev.get_type() {
+            KeyPress => {
+                let ev: &XKeyEvent = ev.as_ref();
+                Some(KeybdPress(ev.keycode as u8))
+            },
+            KeyRelease => {
+                let ev: &XKeyEvent = ev.as_ref();
+                Some(KeybdRelease(ev.keycode as u8))
+            },
+            _ => None
+        } {if let Some(cb) = HOTKEYS.lock().unwrap().get_mut(&hotkey) {cb()}}
+    }
 }
 
 pub fn mouse_move_to(x: i32, y: i32) {
-    STATE.with(|state| if let &Ok((ref xlib, display, window, ref xf86vmode, ref hotkeys)) = state {
-        unsafe {
-            (xlib.XWarpPointer)(display, 0, 0, 0, 0, 0, 0, x, y);
-            (xlib.XFlush)(display);
-        };
-    });
+    unsafe {
+        xlib::XWarpPointer(get_display(), 0, 0, 0, 0, 0, 0, x, y);
+        xlib::XFlush(get_display());
+    };
 }
 
 pub fn mouse_move(x: i32, y: i32) {
-    STATE.with(|state| if let &Ok((ref xlib, display, window, ref xf86vmode, ref hotkeys)) = state {
-        unsafe {
-            (xlib.XWarpPointer)(display, 0, 0, 0, 0, 0, 0, x, y);
-            (xlib.XFlush)(display);
-        }
-    });
+    unsafe {
+        xlib::XWarpPointer(get_display(), 0, 0, 0, 0, 0, 0, x, y);
+        xlib::XFlush(get_display());
+    }
 }
 
-fn send_mouse_input(first: u32, second: i32) {
-    STATE.with(|state| if let &Ok((ref xlib, display, window, ref xf86vmode, ref hotkeys)) = state {
-        unsafe {
-            (xf86vmode.XTestFakeButtonEvent)(display, first, second, 0);
-            (xlib.XFlush)(display);
-        }
-    });
+fn send_mouse_input(button: u32, is_press: i32) {
+    unsafe {
+        xtest::XTestFakeButtonEvent(get_display(), button, is_press, 0);
+        xlib::XFlush(get_display());
+    }
 }
 
-/// Doesn't work for some reason.
-fn send_keybd_input(first: u8, second: i32) {
-    STATE.with(|state| if let &Ok((ref xlib, display, window, ref xf86vmode, ref hotkeys)) = state {
-        let scan_code = unsafe{(xlib.XKeysymToKeycode)(display, first as _) as u32};
-        println!("{}", scan_code);
-        unsafe {
-            (xf86vmode.XTestFakeKeyEvent)(display, scan_code, second, 0);
-            (xlib.XFlush)(display);
-        }
-    });
+
+fn send_keybd_input(scan_code: u8, is_press: i32) {
+    unsafe {
+        xtest::XTestFakeKeyEvent(get_display(), scan_code as u32, is_press, 0);
+        xlib::XFlush(get_display());
+    }
 }
 
 pub fn mouse_press_left() {
@@ -148,20 +121,20 @@ pub fn mouse_scroll_hor(dwheel: i32) {
 pub fn mouse_scroll_ver(dwheel: i32) {
 }
 
-pub fn keybd_press(vk: VKCode) {
+pub fn keybd_press(vk: Code) {
     send_keybd_input(vk, 1);
 }
 
-pub fn keybd_release(vk: VKCode) {
+pub fn keybd_release(vk: Code) {
     send_keybd_input(vk, 0);
 }
 
-/// Needs to be implemented.
-pub fn get_toggle_state(vk_code: VKCode) -> bool {
+/// Don't know how to impliment.
+pub fn is_toggled(vk_code: Code) -> bool {
     false
 }
 
-/// Needs to be implemented.
-pub fn get_logical_state(vk_code: VKCode) -> bool {
+/// Needs to be implemented, don't know how. xquerykeymap?
+pub fn is_pressed(vk_code: Code) -> bool {
     false
 }

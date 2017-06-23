@@ -24,6 +24,5 @@ fn main() {
         if !is_pressed(rbutton()) {break}
     });
     // Stops capture.
-    KeybdPress(scroll_lock()).bind(|| stop_capture());
     start_capture();
 }

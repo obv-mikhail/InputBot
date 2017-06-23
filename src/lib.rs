@@ -39,6 +39,10 @@ lazy_static! {
     static ref CAPTURE_HOTKEYS: Arc<Mutex<bool>> = Arc::new(Mutex::new(false));
 }
 
+pub fn stop_capture() {
+    *CAPTURE_HOTKEYS.lock().unwrap() = false;
+}
+
 #[cfg(target_os = "windows")]
 pub mod windows;
 #[cfg(target_os = "windows")]
