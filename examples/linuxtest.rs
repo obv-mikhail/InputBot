@@ -7,9 +7,7 @@ use std::time::Duration;
 use std::thread::sleep;
 
 fn main() {
-    KeybdPress(w()).bind(|| {
-        println!("t");
-        sleep(Duration::from_millis(500));
+    MousePressLeft.bind(|| {
         keybd_press(x());
         sleep(Duration::from_millis(50));
         keybd_release(x());
