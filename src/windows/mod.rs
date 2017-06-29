@@ -6,49 +6,54 @@ use self::user32::*;
 use *;
 use Event::*;
 use std::mem::{transmute_copy, transmute, size_of, uninitialized};
+use std::cell::RefCell;
 
 pub mod codes;
 
-static mut KEYBD_HHOOK: HHOOK = 0 as HHOOK;
-static mut MOUSE_HHOOK: HHOOK = 0 as HHOOK;
-
 unsafe extern "system" fn hhook_proc(code: c_int, w_param: WPARAM, l_param: LPARAM) -> LRESULT {
     PostMessageW(0 as HWND, 0, w_param, l_param);
-    CallNextHookEx(KEYBD_HHOOK, code, w_param, l_param)
+    CallNextHookEx(0 as _, code, w_param, l_param)
 }
 
-pub fn start_capture() {
-    *CAPTURE_HOTKEYS.lock().unwrap() = true;
-    while *CAPTURE_HOTKEYS.lock().unwrap() {
-        let msg = unsafe {
-            KEYBD_HHOOK = SetWindowsHookExW(13, Some(hhook_proc), 0 as HINSTANCE, 0);
-            MOUSE_HHOOK = SetWindowsHookExW(14, Some(hhook_proc), 0 as HINSTANCE, 0);
-            let mut msg: MSG = uninitialized();
-            GetMessageW(&mut msg, 0 as HWND, 0, 0);
-            UnhookWindowsHookEx(KEYBD_HHOOK);
-            UnhookWindowsHookEx(MOUSE_HHOOK);
-            KEYBD_HHOOK = 0 as HHOOK;
-            MOUSE_HHOOK = 0 as HHOOK;
-            msg
-        };
-        if let Some(hotkey) = match msg.wParam as u32 {
-            WM_KEYDOWN => Some(KeybdPress(unsafe{*(msg.lParam as *const KBDLLHOOKSTRUCT)}.vkCode as u8)),
-            WM_KEYUP => Some(KeybdRelease(unsafe{*(msg.lParam as *const KBDLLHOOKSTRUCT)}.vkCode as u8)),
-            WM_MOUSEMOVE => Some(MouseMove),
-            WM_LBUTTONDOWN => Some(MousePressLeft),
-            WM_LBUTTONUP => Some(MouseReleaseLeft),
-            WM_RBUTTONDOWN => Some(MousePressRight),
-            WM_RBUTTONUP => Some(MouseReleaseRight),
-            WM_MBUTTONDOWN => Some(MousePressMiddle),
-            WM_MBUTTONUP => Some(MouseReleaseMiddle),
-            WM_MOUSEWHEEL => Some(MouseScroll),
-            _ => None
-        } {if let Some(cb) = HOTKEYS.lock().unwrap().get_mut(&hotkey) {cb()}}
+thread_local! {
+    pub static HHOOKS: RefCell<Option<(HHOOK, HHOOK)>> = RefCell::new(None);
+}
+
+pub unsafe fn get_event() -> Option<Event> {
+    let mut msg: MSG = uninitialized();
+    GetMessageW(&mut msg, 0 as HWND, 0, 0);
+    match msg.wParam as u32 {
+        WM_KEYDOWN => Some(KeybdPress((*(msg.lParam as *const KBDLLHOOKSTRUCT)).vkCode as u8)),
+        WM_KEYUP => Some(KeybdRelease((*(msg.lParam as *const KBDLLHOOKSTRUCT)).vkCode as u8)),
+        WM_LBUTTONDOWN => Some(MousePressLeft),
+        WM_LBUTTONUP => Some(MouseReleaseLeft),
+        WM_MBUTTONDOWN => Some(MousePressMiddle),
+        WM_MBUTTONUP => Some(MouseReleaseMiddle),
+        WM_RBUTTONDOWN => Some(MousePressRight),
+        WM_RBUTTONUP => Some(MouseReleaseRight),
+        _ => None
     }
 }
 
-pub fn stop_capture() {
-    *CAPTURE_HOTKEYS.lock().unwrap() = false;
+pub unsafe fn start_capture() {
+    HHOOKS.with(|hhooks| {
+        if let None = *hhooks.as_ptr() {
+            *hhooks.as_ptr() = Some((
+                SetWindowsHookExW(WH_KEYBOARD_LL, Some(hhook_proc), 0 as HINSTANCE, 0),
+                SetWindowsHookExW(WH_MOUSE_LL, Some(hhook_proc), 0 as HINSTANCE, 0)
+            ));
+        }
+    });
+}
+
+pub unsafe fn stop_capture() {
+    HHOOKS.with(|hhooks| {
+        if let Some((keybd_hhook, mouse_hhook)) = *hhooks.as_ptr() {
+            UnhookWindowsHookEx(keybd_hhook);
+            UnhookWindowsHookEx(mouse_hhook);
+            *hhooks.as_ptr() = None;
+        }
+    });
 }
 
 fn send_mouse_input(flags: u32, data: u32, dx: i32, dy: i32) {

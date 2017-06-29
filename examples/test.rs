@@ -4,25 +4,22 @@ use inputbot::*;
 use Event::*;
 use codes::*;
 use std::time::Duration;
-use std::thread::sleep;
+use std::thread::{sleep, park};
 
 fn main() {
     // Autorun for videogames.
-    KeybdPress(num_lock()).bind(|| loop {
+    KeybdPress(num_lock()).bind(|| while is_toggled(num_lock()) {
         keybd_press(shift());
         keybd_press(w());
         sleep(Duration::from_millis(50));
         keybd_release(shift());
         keybd_release(w());
-        if !is_toggled(num_lock()) {break}
     });
     // Rapidfire for videogames.
-    MousePressRight.bind(|| loop {
+    MousePressRight.bind(|| while is_pressed(rbutton()) {
         mouse_press_left();
         sleep(Duration::from_millis(50));
         mouse_release_left();
-        if !is_pressed(rbutton()) {break}
     });
-    // Stops capture.
-    start_capture();
+    park();
 }
