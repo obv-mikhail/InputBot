@@ -24,48 +24,52 @@ fn get_window() -> u64 {
     STATE.lock().unwrap().1
 }
 
-pub fn start_capture() {
-    *CAPTURE_HOTKEYS.lock().unwrap() = true;
-    while *CAPTURE_HOTKEYS.lock().unwrap() {
-        unsafe{XGrabPointer(get_display(), get_window(), true as _,
-        (ButtonPressMask |
-        ButtonReleaseMask |
-        PointerMotionMask) as u32,
-        GrabModeAsync,
-        GrabModeAsync, 0, 0, 0)};
-        for hotkey in HOTKEYS.lock().unwrap().keys() {match hotkey {
-            &KeybdPress(scan_code) | &KeybdRelease(scan_code) => {
-                unsafe{XGrabKey
-                (get_display(), scan_code as i32, 0, get_window(), false as i32, GrabModeAsync, GrabModeAsync)};
-            },
-            _ => {} 
-        }};
-        let mut ev = unsafe{uninitialized()};
-        unsafe{XNextEvent(get_display(), &mut ev)};
-        for hotkey in HOTKEYS.lock().unwrap().keys() {match hotkey {
-            &KeybdPress(scan_code) | &KeybdRelease(scan_code) => {
-                unsafe{XUngrabKey(get_display(), scan_code as i32, 0, get_window())};
-            },
-            _ => {} 
-        }};
-        if let Some(hotkey) = match ev.get_type() {
-            KeyPress => Some(KeybdPress((ev.as_ref() as &XKeyEvent).keycode as u8)),
-            KeyRelease => Some(KeybdRelease((ev.as_ref() as &XKeyEvent).keycode as u8)),
-            ButtonPress => match (ev.as_ref() as &XKeyEvent).keycode {
-                1 => Some(MousePressLeft),
-                2 => Some(MousePressMiddle),
-                3 => Some(MousePressRight),
-                _ => None
-            },
-            ButtonRelease => match (ev.as_ref() as &XKeyEvent).keycode {
-                1 => Some(MouseReleaseLeft),
-                2 => Some(MouseReleaseMiddle),
-                3 => Some(MouseReleaseRight),
-                _ => None
-            },
+
+pub unsafe fn get_event() -> Option<Event> {
+    let mut ev = unsafe{uninitialized()};
+    unsafe{XNextEvent(get_display(), &mut ev)};
+    match ev.get_type() {
+        KeyPress => Some(KeybdPress((ev.as_ref() as &XKeyEvent).keycode as u8)),
+        KeyRelease => Some(KeybdRelease((ev.as_ref() as &XKeyEvent).keycode as u8)),
+        ButtonPress => match (ev.as_ref() as &XKeyEvent).keycode {
+            1 => Some(MousePressLeft),
+            2 => Some(MousePressMiddle),
+            3 => Some(MousePressRight),
             _ => None
-        } {if let Some(cb) = HOTKEYS.lock().unwrap().get_mut(&hotkey) {cb()}}
+        },
+        ButtonRelease => match (ev.as_ref() as &XKeyEvent).keycode {
+            1 => Some(MouseReleaseLeft),
+            2 => Some(MouseReleaseMiddle),
+            3 => Some(MouseReleaseRight),
+            _ => None
+        },
+        _ => None
     }
+}
+
+pub fn start_capture() {
+    //unsafe{XGrabPointer(get_display(), get_window(), true as _,
+    //(ButtonPressMask |
+    //ButtonReleaseMask |
+    //PointerMotionMask) as u32,
+    //GrabModeAsync,
+    //GrabModeAsync, 0, 0, 0)};
+    for hotkey in HOTKEYS.lock().unwrap().keys() {match hotkey {
+        &KeybdPress(scan_code) | &KeybdRelease(scan_code) => {
+            unsafe{XGrabKey
+            (get_display(), scan_code as i32, 0, get_window(), false as i32, GrabModeAsync, GrabModeAsync)};
+        },
+        _ => {} 
+    }};
+}
+
+pub fn stop_capture() {
+    for hotkey in HOTKEYS.lock().unwrap().keys() {match hotkey {
+        &KeybdPress(scan_code) | &KeybdRelease(scan_code) => {
+            unsafe{XUngrabKey(get_display(), scan_code as i32, 0, get_window())};
+        },
+        _ => {} 
+    }};
 }
 
 pub fn mouse_move_to(x: i32, y: i32) {
