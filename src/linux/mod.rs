@@ -6,11 +6,27 @@ use Event::*;
 use std::mem::uninitialized;
 use std::sync::{Arc, Mutex};
 use *;
+use std::cell::RefCell;
+use std::ptr::null;
 
 pub mod codes;
 
+thread_local! {
+    static STATE3: RefCell<(*mut Display, u64)> = RefCell::new({unsafe{
+        let display = XOpenDisplay(std::ptr::null());
+        (display, XDefaultRootWindow(display))
+    }});
+}
+
 lazy_static! {
     static ref STATE: Arc<Mutex<(u64, u64)>> = {unsafe{
+        let display = XOpenDisplay(std::ptr::null());
+        Arc::new(Mutex::new((display as u64, XDefaultRootWindow(display))))
+    }};
+}
+
+lazy_static! {
+    static ref STATE2: Arc<Mutex<(u64, u64)>> = {unsafe{
         let display = XOpenDisplay(std::ptr::null());
         Arc::new(Mutex::new((display as u64, XDefaultRootWindow(display))))
     }};
@@ -24,10 +40,28 @@ fn get_window() -> u64 {
     STATE.lock().unwrap().1
 }
 
+fn get_display2() -> *mut Display {
+    STATE2.lock().unwrap().0 as *mut Display
+}
+
 
 pub unsafe fn get_event() -> Option<Event> {
+    for hotkey in HOTKEYS.lock().unwrap().keys() {match hotkey {
+        &KeybdPress(scan_code) | &KeybdRelease(scan_code) => {
+            unsafe{XGrabKey
+            (get_display(), scan_code as i32, AnyModifier, get_window(), false as i32, GrabModeAsync, GrabModeAsync)};
+        },
+        _ => {} 
+    }};
+    XSelectInput(get_display(), get_window(), KeyPressMask | KeyReleaseMask);
     let mut ev = unsafe{uninitialized()};
     unsafe{XNextEvent(get_display(), &mut ev)};
+    for hotkey in HOTKEYS.lock().unwrap().keys() {match hotkey {
+        &KeybdPress(scan_code) | &KeybdRelease(scan_code) => {
+            unsafe{XUngrabKey(get_display(), scan_code as i32, 0, get_window())};
+        },
+        _ => {} 
+    }};
     match ev.get_type() {
         KeyPress => Some(KeybdPress((ev.as_ref() as &XKeyEvent).keycode as u8)),
         KeyRelease => Some(KeybdRelease((ev.as_ref() as &XKeyEvent).keycode as u8)),
@@ -50,26 +84,12 @@ pub unsafe fn get_event() -> Option<Event> {
 pub fn start_capture() {
     //unsafe{XGrabPointer(get_display(), get_window(), true as _,
     //(ButtonPressMask |
-    //ButtonReleaseMask |
-    //PointerMotionMask) as u32,
+    //ButtonReleaseMask) as u32,
     //GrabModeAsync,
     //GrabModeAsync, 0, 0, 0)};
-    for hotkey in HOTKEYS.lock().unwrap().keys() {match hotkey {
-        &KeybdPress(scan_code) | &KeybdRelease(scan_code) => {
-            unsafe{XGrabKey
-            (get_display(), scan_code as i32, 0, get_window(), false as i32, GrabModeAsync, GrabModeAsync)};
-        },
-        _ => {} 
-    }};
 }
 
 pub fn stop_capture() {
-    for hotkey in HOTKEYS.lock().unwrap().keys() {match hotkey {
-        &KeybdPress(scan_code) | &KeybdRelease(scan_code) => {
-            unsafe{XUngrabKey(get_display(), scan_code as i32, 0, get_window())};
-        },
-        _ => {} 
-    }};
 }
 
 pub fn mouse_move_to(x: i32, y: i32) {
@@ -95,10 +115,12 @@ fn send_mouse_input(button: u32, is_press: i32) {
 
 
 fn send_keybd_input(scan_code: u8, is_press: i32) {
-    unsafe {
-        XTestFakeKeyEvent(get_display(), scan_code as u32, is_press, 0);
-        XFlush(get_display());
-    }
+    STATE3.with(|state| {
+        unsafe {
+            XTestFakeKeyEvent((*state.as_ptr()).0, scan_code as u32, is_press, 0);
+            XFlush((*state.as_ptr()).0);
+        }
+    });
 }
 
 pub fn mouse_press_left() {

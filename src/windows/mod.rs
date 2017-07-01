@@ -16,7 +16,7 @@ unsafe extern "system" fn hhook_proc(code: c_int, w_param: WPARAM, l_param: LPAR
 }
 
 thread_local! {
-    pub static HHOOKS: RefCell<Option<(HHOOK, HHOOK)>> = RefCell::new(None);
+    static HHOOKS: RefCell<Option<(HHOOK, HHOOK)>> = RefCell::new(None);
 }
 
 pub unsafe fn get_event() -> Option<Event> {
