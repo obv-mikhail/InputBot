@@ -1,11 +1,11 @@
 use Code;
 use linux::x11::*;
 use linux::x11::xlib::*;
-use linux::get_display;
+use linux::get_display2;
 use *;
 
 fn get_code(keysym: u8) -> u8 {
-    unsafe{XKeysymToKeycode(get_display(), keysym as _)}
+    unsafe{XKeysymToKeycode(get_display2(), keysym as _)}
 }
 
 lazy_static! {

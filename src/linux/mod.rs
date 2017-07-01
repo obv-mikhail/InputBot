@@ -16,11 +16,18 @@ lazy_static! {
         let display = XOpenDisplay(null());
         (display as u64, XDefaultRootWindow(display))
     }};
+    static ref STATE2: (u64, u64) = {unsafe{
+        let display = XOpenDisplay(null());
+        (display as u64, XDefaultRootWindow(display))
+    }};
 }
-
 
 fn get_display() -> *mut Display {
     STATE.0 as *mut Display
+}
+
+fn get_display2() -> *mut Display {
+    STATE2.0 as *mut Display
 }
 
 fn get_window() -> u64 {
@@ -28,7 +35,6 @@ fn get_window() -> u64 {
 }
 
 pub unsafe fn get_event() -> Option<Event> {
-    unsafe {XLockDisplay(get_display())};
     for hotkey in HOTKEYS.lock().unwrap().keys() {match hotkey {
         &KeybdPress(scan_code) | &KeybdRelease(scan_code) => {
             unsafe{XGrabKey
@@ -39,7 +45,6 @@ pub unsafe fn get_event() -> Option<Event> {
     XSelectInput(get_display(), get_window(), KeyPressMask | KeyReleaseMask);
     let mut ev = unsafe{uninitialized()};
     unsafe{XNextEvent(get_display(), &mut ev)};
-    unsafe {XUnlockDisplay(get_display())};
     for hotkey in HOTKEYS.lock().unwrap().keys() {match hotkey {
         &KeybdPress(scan_code) | &KeybdRelease(scan_code) => {
             unsafe{XUngrabKey(get_display(), scan_code as i32, 0, get_window())};
@@ -71,7 +76,6 @@ pub fn start_capture() {
     //ButtonReleaseMask) as u32,
     //GrabModeAsync,
     //GrabModeAsync, 0, 0, 0)};
-    unsafe {XInitThreads()};
 }
 
 pub fn stop_capture() {
@@ -79,32 +83,30 @@ pub fn stop_capture() {
 
 pub fn mouse_move_to(x: i32, y: i32) {
     unsafe {
-        XWarpPointer(get_display(), 0, 0, 0, 0, 0, 0, x, y);
-        XFlush(get_display());
+        XWarpPointer(get_display2(), 0, 0, 0, 0, 0, 0, x, y);
+        XFlush(get_display2());
     };
 }
 
 pub fn mouse_move(x: i32, y: i32) {
     unsafe {
-        XWarpPointer(get_display(), 0, 0, 0, 0, 0, 0, x, y);
-        XFlush(get_display());
+        XWarpPointer(get_display2(), 0, 0, 0, 0, 0, 0, x, y);
+        XFlush(get_display2());
     }
 }
 
 fn send_mouse_input(button: u32, is_press: i32) {
     unsafe {
-        XTestFakeButtonEvent(get_display(), button, is_press, 0);
-        XFlush(get_display());
+        XTestFakeButtonEvent(get_display2(), button, is_press, 0);
+        XFlush(get_display2());
     }
 }
 
 
 fn send_keybd_input(scan_code: u8, is_press: i32) {
     unsafe {
-        XLockDisplay(get_display());
-        XTestFakeKeyEvent(get_display(), scan_code as u32, is_press, 0);
-        XFlush(get_display());
-        XUnlockDisplay(get_display())
+        XTestFakeKeyEvent(get_display2(), scan_code as u32, is_press, 0);
+        XFlush(get_display2());
     }
 }
 
