@@ -1,11 +1,14 @@
 use Code;
 use linux::x11::*;
 use linux::x11::xlib::*;
-use linux::get_display2;
+use std::ptr::null;
 use *;
 
 fn get_code(keysym: u8) -> u8 {
-    unsafe{XKeysymToKeycode(get_display2(), keysym as _)}
+    let display = unsafe {XOpenDisplay(null())};
+    let keycode = unsafe{XKeysymToKeycode(display, keysym as _)};
+    unsafe {XCloseDisplay(display)};
+    keycode
 }
 
 lazy_static! {
