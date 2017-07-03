@@ -1,41 +1,28 @@
 extern crate inputbot;
 
 use inputbot::*;
-use Event::*;
+use InputEvent::*;
 use codes::*;
 use std::time::Duration;
 use std::thread::{sleep, park};
 
 fn main() {
     // Autorun for videogames.
-    KeybdPress(*E).bind(||
-        {
-            keybd_press(*W);
-            sleep(Duration::from_millis(50));
-            keybd_release(*W);
-        }
-    );
-    KeybdPress(*R).bind(||
-        {
-            keybd_press(*F);
-            sleep(Duration::from_millis(50));
-            keybd_release(*F);
-                        keybd_press(*F);
-            sleep(Duration::from_millis(50));
-            keybd_release(*F);
-        }
-    );
+    PressKey(NUM_LOCK).bind(|| while num_lock_is_toggled() {
+        keybd_press(SHIFT);
+        keybd_press(W);
+        sleep(Duration::from_millis(50));
+        keybd_release(SHIFT);
+        keybd_release(W);
+    });
 
-   MousePressLeft.bind(||
-        {
-            keybd_press(*F);
-            sleep(Duration::from_millis(50));
-            keybd_release(*F);
-                        keybd_press(*F);
-            sleep(Duration::from_millis(50));
-            keybd_release(*F);
-        }
-    );
+    // Rapidfire for videogames.
+    PressRButton.bind(|| while is_pressed(RBUTTON) {
+        mouse_press_left();
+        sleep(Duration::from_millis(50));
+        mouse_release_left();
+    });
+
     // Prevent main thread from exiting.
     park();
 }

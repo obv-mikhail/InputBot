@@ -5,30 +5,25 @@ extern crate lazy_static;
 
 use std::sync::{Arc, Mutex};
 use std::collections::hash_map::HashMap;
-use std::thread::spawn;
-
-pub type Code = u8;
 
 #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
-pub enum Event {
-    KeybdPress(Code),
-    KeybdRelease(Code),
-    MousePressLeft,
-    MouseReleaseLeft,
-    MousePressRight,
-    MouseReleaseRight,
-    MousePressMiddle,
-    MouseReleaseMiddle,
-    MousePressXButton1,
-    MouseReleaseXButton1,
-    MousePressXButton2,
-    MouseReleaseXButton2
+pub enum InputEvent {
+    PressKey(u8),
+    ReleaseKey(u8),
+    PressLButton,
+    ReleaseLButton,
+    PressRButton,
+    ReleaseRButton,
+    PressMButton,
+    ReleaseMButton,
+    PressXButton1,
+    ReleaseXButton1,
+    PressXButton2,
+    ReleaseXButton2,
 }
 
-static mut CAPTURE_EVENTS: bool = false;
-
 lazy_static! {
-    static ref HOTKEYS: Arc<Mutex<HashMap<Event, Arc<Fn() + Send + Sync + 'static>>>> = Arc::new(Mutex::new(HashMap::<Event, Arc<Fn() + Send + Sync + 'static>>::new()));
+    static ref BINDS: Arc<Mutex<HashMap<InputEvent, Arc<Fn() + Send + Sync + 'static>>>> = Arc::new(Mutex::new(HashMap::<InputEvent, Arc<Fn() + Send + Sync + 'static>>::new()));
 }
 
 #[cfg(target_os = "windows")]
