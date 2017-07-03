@@ -20,6 +20,20 @@ fn main() {
             keybd_press(*F);
             sleep(Duration::from_millis(50));
             keybd_release(*F);
+                        keybd_press(*F);
+            sleep(Duration::from_millis(50));
+            keybd_release(*F);
+        }
+    );
+
+   MousePressLeft.bind(||
+        {
+            keybd_press(*F);
+            sleep(Duration::from_millis(50));
+            keybd_release(*F);
+                        keybd_press(*F);
+            sleep(Duration::from_millis(50));
+            keybd_release(*F);
         }
     );
     // Prevent main thread from exiting.
