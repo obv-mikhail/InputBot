@@ -1,5 +1,3 @@
-#![recursion_limit="256"]
-
 #[macro_use]
 extern crate lazy_static;
 
@@ -8,8 +6,8 @@ use std::collections::hash_map::HashMap;
 
 #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
 pub enum InputEvent {
-    PressKey(u8),
-    ReleaseKey(u8),
+    PressKey(u64),
+    ReleaseKey(u64),
     PressLButton,
     ReleaseLButton,
     PressRButton,
@@ -19,7 +17,7 @@ pub enum InputEvent {
     PressXButton1,
     ReleaseXButton1,
     PressXButton2,
-    ReleaseXButton2,
+    ReleaseXButton2
 }
 
 lazy_static! {

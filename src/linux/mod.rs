@@ -2,25 +2,27 @@ extern crate x11;
 
 use self::x11::xlib::*;
 use self::x11::xtest::*;
-use Event::*;
+use InputEvent::*;
 use std::mem::{uninitialized, transmute};
 use ::*;
 use std::ptr::null;
+use std::thread::spawn;
 
 pub mod codes;
 
-impl Event {
+impl InputEvent {
     pub fn bind<F>(self, callback: F)
     where
         F: Fn() + Send + Sync + 'static,
     {
-        HOTKEYS.lock().unwrap().insert(self, Arc::new(callback));
-        if HOTKEYS.lock().unwrap().len() != 1 {
+        let input = fix_input_event(self);
+        BINDS.lock().unwrap().insert(input, Arc::new(callback));
+        if BINDS.lock().unwrap().len() != 1 {
             return;
         };
-        spawn(move || while HOTKEYS.lock().unwrap().len() != 0 {
+        spawn(move || while BINDS.lock().unwrap().len() != 0 {
             if let Some(event) = unsafe { get_event() } {
-                if let Some(cb) = HOTKEYS.lock().unwrap().get_mut(&event) {
+                if let Some(cb) = BINDS.lock().unwrap().get_mut(&event) {
                     let cb = cb.clone();
                     spawn(move || cb());
                 };
@@ -29,13 +31,21 @@ impl Event {
     }
 
     pub fn unbind(self) {
-        HOTKEYS.lock().unwrap().remove(&self);
+        BINDS.lock().unwrap().remove(&self);
     }
 }
 
-fn get_key_code(code: Code) -> u8 {
+fn fix_input_event(input: InputEvent) -> InputEvent {
+    match input {
+        PressKey(mut keysym) => PressKey(get_key_code(keysym) as u64),
+        ReleaseKey(mut keysym) => ReleaseKey(get_key_code(keysym) as u64),
+        _ => input
+    }
+}
+
+fn get_key_code(code: u64) -> u8 {
     let display = unsafe { XOpenDisplay(null()) };
-    let key_code = unsafe { XKeysymToKeycode(display, code as _) };
+    let key_code = unsafe { XKeysymToKeycode(display, code) };
     unsafe { XCloseDisplay(display) };
     key_code
 }
@@ -66,14 +76,23 @@ fn grab_button(button: u32, display: *mut Display, window: u64) {
     }
 }
 
-pub unsafe fn get_event() -> Option<Event> {
+pub unsafe fn get_event() -> Option<InputEvent> {
     let mut ev = uninitialized();
     with_display(|display| {
         let window = XDefaultRootWindow(display);
-        for hotkey in HOTKEYS.lock().unwrap().keys() {
+        for hotkey in BINDS.lock().unwrap().keys() {
             match hotkey {
-                &KeybdPress(key_code) |
-                &KeybdRelease(key_code) => {
+                &PressKey(key_code) |
+                &ReleaseKey(key_code) => {
+                    XGrabKey(
+                        display,
+                        key_code as i32,
+                        ShiftMask,
+                        window,
+                        0,
+                        GrabModeAsync,
+                        GrabModeAsync,
+                    );
                     XGrabKey(
                         display,
                         key_code as i32,
@@ -84,33 +103,33 @@ pub unsafe fn get_event() -> Option<Event> {
                         GrabModeAsync,
                     );
                 }
-                &MousePressLeft |
-                &MouseReleaseLeft => grab_button(Button1, display, window),
-                &MousePressRight |
-                &MouseReleaseRight => grab_button(Button3, display, window),
-                &MousePressMiddle |
-                &MouseReleaseMiddle => grab_button(Button2, display, window),
+                &PressLButton |
+                &ReleaseLButton => grab_button(Button1, display, window),
+                &PressRButton |
+                &ReleaseRButton => grab_button(Button3, display, window),
+                &PressMButton |
+                &ReleaseMButton => grab_button(Button2, display, window),
                 _ => {} 
             }
         }
         XNextEvent(display, &mut ev);
     });
     let hotkey = match ev.get_type() {
-        KeyPress => Some(KeybdPress((ev.as_ref() as &XKeyEvent).keycode as u8)),
-        KeyRelease => Some(KeybdRelease((ev.as_ref() as &XKeyEvent).keycode as u8)),
+        KeyPress => Some(PressKey((ev.as_ref() as &XKeyEvent).keycode as u64)),
+        KeyRelease => Some(ReleaseKey((ev.as_ref() as &XKeyEvent).keycode as u64)),
         ButtonPress => {
             match (ev.as_ref() as &XKeyEvent).keycode {
-                1 => Some(MousePressLeft),
-                2 => Some(MousePressMiddle),
-                3 => Some(MousePressRight),
+                1 => Some(PressLButton),
+                2 => Some(PressMButton),
+                3 => Some(PressRButton),
                 _ => None,
             }
         }
         ButtonRelease => {
             match (ev.as_ref() as &XKeyEvent).keycode {
-                1 => Some(MouseReleaseLeft),
-                2 => Some(MouseReleaseMiddle),
-                3 => Some(MouseReleaseRight),
+                1 => Some(ReleaseLButton),
+                2 => Some(ReleaseMButton),
+                3 => Some(ReleaseRButton),
                 _ => None,
             }
         }
@@ -167,12 +186,12 @@ pub fn mouse_release_middle() {
     send_mouse_input(2, 0);
 }
 
-pub fn keybd_press(code: Code) {
-    send_keybd_input(code, 1);
+pub fn keybd_press(code: u64) {
+    send_keybd_input(get_key_code(code), 1);
 }
 
-pub fn keybd_release(code: Code) {
-    send_keybd_input(code, 0);
+pub fn keybd_release(code: u64) {
+    send_keybd_input(get_key_code(code), 0);
 }
 
 pub fn num_lock_is_toggled() -> bool {
@@ -181,7 +200,8 @@ pub fn num_lock_is_toggled() -> bool {
         XGetKeyboardControl(display, &mut state);
     });
     (state.led_mask & 2 != 0)
-}
+}                                                 
+                                                             
 
 pub fn caps_lock_is_toggled() -> bool {
     let mut state: XKeyboardState = unsafe { uninitialized() };
@@ -191,7 +211,7 @@ pub fn caps_lock_is_toggled() -> bool {
     (state.led_mask & 1 != 0)
 }
 
-pub fn is_pressed(code: Code) -> bool {
+pub fn is_pressed(code: u8) -> bool {
     let mut array: [i8; 32] = [0; 32];
     with_display(|display| unsafe {
         XQueryKeymap(display, transmute(&mut array));
