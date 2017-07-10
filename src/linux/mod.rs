@@ -73,7 +73,7 @@ fn grab_button(button: u32, display: *mut Display, window: u64) {
             AnyModifier,
             window,
             0,
-            ButtonReleaseMask as u32,
+            (ButtonPressMask | ButtonReleaseMask) as u32,
             GrabModeAsync,
             GrabModeAsync,
             0,
@@ -86,7 +86,6 @@ pub unsafe fn get_event() -> Option<InputEvent> {
     let mut ev = uninitialized();
     with_display(|display| {
         let window = XDefaultRootWindow(display);
-        XSelectInput(display, window, ButtonReleaseMask);
         for hotkey in BINDS.lock().unwrap().keys() {
             match hotkey {
                 &PressKey(key_code) |
@@ -136,9 +135,6 @@ pub unsafe fn get_event() -> Option<InputEvent> {
                 },
                 3 => {
                     *RBUTTON_STATE.lock().unwrap() = true;
-
-                    println!("test, {}", *RBUTTON_STATE.lock().unwrap());
-
                     Some(PressRButton)
                 },
                 _ => None,
