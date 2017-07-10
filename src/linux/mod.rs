@@ -10,6 +10,12 @@ use std::thread::spawn;
 
 pub mod codes;
 
+lazy_static! {
+    static ref LBUTTON_STATE: Arc<Mutex<bool>> = Arc::new(Mutex::new(false));
+    static ref MBUTTON_STATE: Arc<Mutex<bool>> = Arc::new(Mutex::new(false));
+    static ref RBUTTON_STATE: Arc<Mutex<bool>> = Arc::new(Mutex::new(false));
+}
+
 impl InputEvent {
     pub fn bind<F>(self, callback: F)
     where
@@ -64,10 +70,10 @@ fn grab_button(button: u32, display: *mut Display, window: u64) {
         XGrabButton(
             display,
             button,
-            0,
+            AnyModifier,
             window,
             0,
-            (ButtonPressMask | ButtonReleaseMask) as u32,
+            ButtonReleaseMask as u32,
             GrabModeAsync,
             GrabModeAsync,
             0,
@@ -80,6 +86,7 @@ pub unsafe fn get_event() -> Option<InputEvent> {
     let mut ev = uninitialized();
     with_display(|display| {
         let window = XDefaultRootWindow(display);
+        XSelectInput(display, window, ButtonReleaseMask);
         for hotkey in BINDS.lock().unwrap().keys() {
             match hotkey {
                 &PressKey(key_code) |
@@ -102,7 +109,7 @@ pub unsafe fn get_event() -> Option<InputEvent> {
                         GrabModeAsync,
                         GrabModeAsync,
                     );
-                }
+                },
                 &PressLButton |
                 &ReleaseLButton => grab_button(Button1, display, window),
                 &PressRButton |
@@ -119,17 +126,38 @@ pub unsafe fn get_event() -> Option<InputEvent> {
         KeyRelease => Some(ReleaseKey((ev.as_ref() as &XKeyEvent).keycode as u64)),
         ButtonPress => {
             match (ev.as_ref() as &XKeyEvent).keycode {
-                1 => Some(PressLButton),
-                2 => Some(PressMButton),
-                3 => Some(PressRButton),
+                1 => {
+                    *LBUTTON_STATE.lock().unwrap() = true;
+                    Some(PressLButton)
+                },
+                2 => {
+                    *MBUTTON_STATE.lock().unwrap() = true;
+                    Some(PressMButton)
+                },
+                3 => {
+                    *RBUTTON_STATE.lock().unwrap() = true;
+
+                    println!("test, {}", *RBUTTON_STATE.lock().unwrap());
+
+                    Some(PressRButton)
+                },
                 _ => None,
             }
         }
         ButtonRelease => {
             match (ev.as_ref() as &XKeyEvent).keycode {
-                1 => Some(ReleaseLButton),
-                2 => Some(ReleaseMButton),
-                3 => Some(ReleaseRButton),
+                1 => {
+                    *LBUTTON_STATE.lock().unwrap() = false;
+                    Some(ReleaseLButton)
+                },
+                2 => {
+                    *MBUTTON_STATE.lock().unwrap() = false;
+                    Some(ReleaseMButton)
+                },
+                3 => {
+                    *RBUTTON_STATE.lock().unwrap() = false;
+                    Some(ReleaseRButton)
+                },
                 _ => None,
             }
         }
@@ -211,10 +239,23 @@ pub fn caps_lock_is_toggled() -> bool {
     (state.led_mask & 1 != 0)
 }
 
-pub fn is_pressed(code: u8) -> bool {
+pub fn is_pressed(code: u64) -> bool {
+    let code = get_key_code(code);
     let mut array: [i8; 32] = [0; 32];
     with_display(|display| unsafe {
         XQueryKeymap(display, transmute(&mut array));
     });
     array[(code >> 3) as usize] & (1 << (code & 7)) != 0
+}
+
+pub fn is_pressed_lbutton() -> bool {
+    unsafe{*LBUTTON_STATE.lock().unwrap()}
+}
+
+pub fn is_pressed_mbutton() -> bool {
+    unsafe{*MBUTTON_STATE.lock().unwrap()}
+}
+
+pub fn is_pressed_rbutton() -> bool {
+    unsafe{*RBUTTON_STATE.lock().unwrap()}
 }
