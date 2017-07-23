@@ -50,9 +50,8 @@ fn fix_input_event(input: InputEvent) -> InputEvent {
 }
 
 fn get_key_code(code: u64) -> u8 {
-    let display = unsafe { XOpenDisplay(null()) };
-    let key_code = unsafe { XKeysymToKeycode(display, code) };
-    unsafe { XCloseDisplay(display) };
+    let mut key_code = 0;
+    with_display(|display| key_code = unsafe { XKeysymToKeycode(display, code) });
     key_code
 }
 
@@ -60,9 +59,22 @@ fn with_display<F>(cb: F)
 where
     F: FnOnce(*mut Display),
 {
-    let display = unsafe { XOpenDisplay(null()) };
+    let display = *STATE.lock().unwrap() as *mut Display;
+    unsafe { XLockDisplay(display); };
     cb(display);
-    unsafe { XCloseDisplay(display) };
+    unsafe { XUnlockDisplay(display); };
+        unsafe { XFlush(display) };
+}
+
+fn with_display2<F>(cb: F)
+where
+    F: FnOnce(*mut Display),
+{
+    let display = *STATE2.lock().unwrap() as *mut Display;
+    unsafe { XLockDisplay(display); };
+    cb(display);
+    unsafe { XUnlockDisplay(display); };
+    unsafe { XFlush(display) };
 }
 
 fn grab_button(button: u32, display: *mut Display, window: u64) {
@@ -82,9 +94,31 @@ fn grab_button(button: u32, display: *mut Display, window: u64) {
     }
 }
 
+fn ungrab_button(button: u32, display: *mut Display, window: u64) {
+    unsafe {
+        XUngrabButton(
+            display,
+            button,
+            AnyModifier,
+            window
+        );
+    }
+}
+
+lazy_static! {
+    static ref STATE: Arc<Mutex<u64>> = {unsafe{
+        XInitThreads();
+        Arc::new(Mutex::new(XOpenDisplay(std::ptr::null()) as u64))
+    }};
+    static ref STATE2: Arc<Mutex<u64>> = {unsafe{
+        XInitThreads();
+        Arc::new(Mutex::new(XOpenDisplay(std::ptr::null()) as u64))
+    }};
+}
+
 pub unsafe fn get_event() -> Option<InputEvent> {
     let mut ev = uninitialized();
-    with_display(|display| {
+    with_display2(|display| {
         let window = XDefaultRootWindow(display);
         for hotkey in BINDS.lock().unwrap().keys() {
             match hotkey {
@@ -119,6 +153,20 @@ pub unsafe fn get_event() -> Option<InputEvent> {
             }
         }
         XNextEvent(display, &mut ev);
+        for hotkey in BINDS.lock().unwrap().keys() {
+            match hotkey {
+                &PressKey(scan_code) | &ReleaseKey(scan_code) => {
+                    unsafe{XUngrabKey(display, scan_code as i32, 0, window)};
+                },
+                &PressLButton |
+                &ReleaseLButton => ungrab_button(Button1, display, window),
+                &PressRButton |
+                &ReleaseRButton => ungrab_button(Button3, display, window),
+                &PressMButton |
+                &ReleaseMButton => ungrab_button(Button2, display, window),
+                _ => {} 
+            }
+        };
     });
     let hotkey = match ev.get_type() {
         KeyPress => Some(PressKey((ev.as_ref() as &XKeyEvent).keycode as u64)),
@@ -127,31 +175,37 @@ pub unsafe fn get_event() -> Option<InputEvent> {
             match (ev.as_ref() as &XKeyEvent).keycode {
                 1 => {
                     *LBUTTON_STATE.lock().unwrap() = true;
+                    mouse_press_left();
                     Some(PressLButton)
                 },
                 2 => {
                     *MBUTTON_STATE.lock().unwrap() = true;
+                    mouse_press_middle();
                     Some(PressMButton)
                 },
                 3 => {
                     *RBUTTON_STATE.lock().unwrap() = true;
+                    mouse_press_right();
                     Some(PressRButton)
                 },
                 _ => None,
             }
-        }
+        },
         ButtonRelease => {
             match (ev.as_ref() as &XKeyEvent).keycode {
                 1 => {
                     *LBUTTON_STATE.lock().unwrap() = false;
+                    mouse_release_left();
                     Some(ReleaseLButton)
                 },
                 2 => {
                     *MBUTTON_STATE.lock().unwrap() = false;
+                    mouse_release_middle();
                     Some(ReleaseMButton)
                 },
                 3 => {
                     *RBUTTON_STATE.lock().unwrap() = false;
+                    mouse_release_right();
                     Some(ReleaseRButton)
                 },
                 _ => None,
