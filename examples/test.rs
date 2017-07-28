@@ -9,15 +9,16 @@ use std::thread::{sleep, park};
 fn main() {
     // Autorun for videogames.
     NumLockKey.bind(|| while num_lock_is_toggled() {
-        ShiftKey.press();
+        LShiftKey.press();
         WKey.press();
         sleep(Duration::from_millis(50));
         WKey.release();
-        ShiftKey.release();
+        LShiftKey.release();
     });
 
     // Rapidfire for videogames.
     RightButton.bind(|| while RightButton.is_pressed() {
+        println!("test");
         LeftButton.press();
         sleep(Duration::from_millis(50));
         LeftButton.release();

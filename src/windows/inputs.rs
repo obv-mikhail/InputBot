@@ -4,8 +4,6 @@ pub enum KeybdKey {
     BackspaceKey = 0x08,
     TabKey = 0x09,
     EnterKey = 0x0D,
-    ShiftKey = 0x10,
-    ControlKey = 0x11,
     EscapeKey = 0x1B,
     SpaceKey = 0x20,
     HomeKey = 0x24,

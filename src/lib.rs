@@ -8,9 +8,12 @@ use std::collections::hash_map::HashMap;
 mod windows;
 #[cfg(target_os = "windows")]
 pub use windows::*;
+#[cfg(target_os = "windows")]
 pub use windows::inputs::*;
 
 #[cfg(target_os = "linux")]
 mod linux;
 #[cfg(target_os = "linux")]
 pub use linux::*;
+#[cfg(target_os = "linux")]
+pub use linux::inputs::*;
