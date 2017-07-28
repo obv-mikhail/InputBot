@@ -18,7 +18,6 @@ fn main() {
 
     // Rapidfire for videogames.
     RightButton.bind(|| while RightButton.is_pressed() {
-        println!("test");
         LeftButton.press();
         sleep(Duration::from_millis(50));
         LeftButton.release();
