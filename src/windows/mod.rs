@@ -17,9 +17,9 @@ unsafe extern "system" fn keybd_proc(code: c_int, w_param: WPARAM, l_param: LPAR
         });
     };
     if let Some(event) = match w_param as u32 {
-        WM_KEYDOWN => Some(
-            transmute((*(l_param as *const KBDLLHOOKSTRUCT)).vkCode as u32),
-        ),
+        WM_KEYDOWN => Some(transmute(
+            (*(l_param as *const KBDLLHOOKSTRUCT)).vkCode as u32,
+        )),
         _ => None,
     } {
         if let Some(cb) = KEYBD_BINDS.lock().unwrap().get_mut(&event) {
@@ -69,10 +69,15 @@ impl KeybdKey {
         if KEYBD_BINDS.lock().unwrap().len() != 1 {
             return;
         };
-        spawn(move || unsafe{
-            KEYBD_HHOOK.with(|hhook| *hhook.as_ptr() = Some(
-                SetWindowsHookExW(WH_KEYBOARD_LL, Some(keybd_proc), 0 as HINSTANCE, 0)
-            ));
+        spawn(move || unsafe {
+            KEYBD_HHOOK.with(|hhook| {
+                *hhook.as_ptr() = Some(SetWindowsHookExW(
+                    WH_KEYBOARD_LL,
+                    Some(keybd_proc),
+                    0 as HINSTANCE,
+                    0,
+                ))
+            });
             let mut msg: MSG = uninitialized();
             GetMessageW(&mut msg, 0 as HWND, 0, 0);
         });
@@ -107,10 +112,15 @@ impl MouseButton {
         if MOUSE_BINDS.lock().unwrap().len() != 1 {
             return;
         };
-        spawn(move || unsafe{
-            MOUSE_HHOOK.with(|hhook| *hhook.as_ptr() = Some(
-                SetWindowsHookExW(WH_MOUSE_LL, Some(mouse_proc), 0 as HINSTANCE, 0)
-            ));
+        spawn(move || unsafe {
+            MOUSE_HHOOK.with(|hhook| {
+                *hhook.as_ptr() = Some(SetWindowsHookExW(
+                    WH_MOUSE_LL,
+                    Some(mouse_proc),
+                    0 as HINSTANCE,
+                    0,
+                ))
+            });
             let mut msg: MSG = uninitialized();
             GetMessageW(&mut msg, 0 as HWND, 0, 0);
         });
@@ -132,7 +142,7 @@ impl MouseButton {
             MouseButton::LeftButton => send_mouse_input(MOUSEEVENTF_LEFTDOWN, 0, 0, 0),
             MouseButton::RightButton => send_mouse_input(MOUSEEVENTF_RIGHTDOWN, 0, 0, 0),
             MouseButton::MiddleButton => send_mouse_input(MOUSEEVENTF_MIDDLEDOWN, 0, 0, 0),
-            _ => {},
+            _ => {}
         }
     }
 
@@ -141,7 +151,7 @@ impl MouseButton {
             MouseButton::LeftButton => send_mouse_input(MOUSEEVENTF_LEFTUP, 0, 0, 0),
             MouseButton::RightButton => send_mouse_input(MOUSEEVENTF_RIGHTUP, 0, 0, 0),
             MouseButton::MiddleButton => send_mouse_input(MOUSEEVENTF_MIDDLEUP, 0, 0, 0),
-            _ => {},
+            _ => {}
         }
     }
 }
