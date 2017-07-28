@@ -81,6 +81,7 @@ pub const F11: u64 = 0xFFC8;
 pub const F12: u64 = 0xFFC9;
 pub const NUM_LOCK: u64 = 0xFF7F;
 pub const SCROLL_LOCK: u64 = 0x91;
+pub const CAPS_LOCK: u64 = 0x0207;
 pub const LSHIFT: u64 = 0xFFE1;
 pub const RSHIFT: u64 = 0xFFE2;
 pub const LCONTROL: u64 = 0xA2;

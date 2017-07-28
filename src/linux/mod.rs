@@ -45,13 +45,15 @@ fn fix_input_event(input: InputEvent) -> InputEvent {
     match input {
         PressKey(mut keysym) => PressKey(get_key_code(keysym) as u64),
         ReleaseKey(mut keysym) => ReleaseKey(get_key_code(keysym) as u64),
-        _ => input
+        _ => input,
     }
 }
 
 fn get_key_code(code: u64) -> u8 {
     let mut key_code = 0;
-    with_display(|display| key_code = unsafe { XKeysymToKeycode(display, code) });
+    with_display(|display| {
+        key_code = unsafe { XKeysymToKeycode(display, code) }
+    });
     key_code
 }
 
@@ -60,10 +62,14 @@ where
     F: FnOnce(*mut Display),
 {
     let display = *STATE.lock().unwrap() as *mut Display;
-    unsafe { XLockDisplay(display); };
+    unsafe {
+        XLockDisplay(display);
+    };
     cb(display);
-    unsafe { XUnlockDisplay(display); };
-        unsafe { XFlush(display) };
+    unsafe {
+        XUnlockDisplay(display);
+    };
+    unsafe { XFlush(display) };
 }
 
 fn with_display2<F>(cb: F)
@@ -71,9 +77,13 @@ where
     F: FnOnce(*mut Display),
 {
     let display = *STATE2.lock().unwrap() as *mut Display;
-    unsafe { XLockDisplay(display); };
+    unsafe {
+        XLockDisplay(display);
+    };
     cb(display);
-    unsafe { XUnlockDisplay(display); };
+    unsafe {
+        XUnlockDisplay(display);
+    };
     unsafe { XFlush(display) };
 }
 
@@ -96,12 +106,7 @@ fn grab_button(button: u32, display: *mut Display, window: u64) {
 
 fn ungrab_button(button: u32, display: *mut Display, window: u64) {
     unsafe {
-        XUngrabButton(
-            display,
-            button,
-            AnyModifier,
-            window
-        );
+        XUngrabButton(display, button, AnyModifier, window);
     }
 }
 
@@ -142,31 +147,26 @@ pub unsafe fn get_event() -> Option<InputEvent> {
                         GrabModeAsync,
                         GrabModeAsync,
                     );
-                },
-                &PressLButton |
-                &ReleaseLButton => grab_button(Button1, display, window),
-                &PressRButton |
-                &ReleaseRButton => grab_button(Button3, display, window),
-                &PressMButton |
-                &ReleaseMButton => grab_button(Button2, display, window),
+                }
+                &PressLButton | &ReleaseLButton => grab_button(Button1, display, window),
+                &PressRButton | &ReleaseRButton => grab_button(Button3, display, window),
+                &PressMButton | &ReleaseMButton => grab_button(Button2, display, window),
                 _ => {} 
             }
         }
         XNextEvent(display, &mut ev);
         for hotkey in BINDS.lock().unwrap().keys() {
             match hotkey {
-                &PressKey(scan_code) | &ReleaseKey(scan_code) => {
-                    unsafe{XUngrabKey(display, scan_code as i32, 0, window)};
-                },
-                &PressLButton |
-                &ReleaseLButton => ungrab_button(Button1, display, window),
-                &PressRButton |
-                &ReleaseRButton => ungrab_button(Button3, display, window),
-                &PressMButton |
-                &ReleaseMButton => ungrab_button(Button2, display, window),
+                &PressKey(scan_code) |
+                &ReleaseKey(scan_code) => {
+                    unsafe { XUngrabKey(display, scan_code as i32, 0, window) };
+                }
+                &PressLButton | &ReleaseLButton => ungrab_button(Button1, display, window),
+                &PressRButton | &ReleaseRButton => ungrab_button(Button3, display, window),
+                &PressMButton | &ReleaseMButton => ungrab_button(Button2, display, window),
                 _ => {} 
             }
-        };
+        }
     });
     let hotkey = match ev.get_type() {
         KeyPress => Some(PressKey((ev.as_ref() as &XKeyEvent).keycode as u64)),
@@ -177,37 +177,37 @@ pub unsafe fn get_event() -> Option<InputEvent> {
                     *LBUTTON_STATE.lock().unwrap() = true;
                     mouse_press_left();
                     Some(PressLButton)
-                },
+                }
                 2 => {
                     *MBUTTON_STATE.lock().unwrap() = true;
                     mouse_press_middle();
                     Some(PressMButton)
-                },
+                }
                 3 => {
                     *RBUTTON_STATE.lock().unwrap() = true;
                     mouse_press_right();
                     Some(PressRButton)
-                },
+                }
                 _ => None,
             }
-        },
+        }
         ButtonRelease => {
             match (ev.as_ref() as &XKeyEvent).keycode {
                 1 => {
                     *LBUTTON_STATE.lock().unwrap() = false;
                     mouse_release_left();
                     Some(ReleaseLButton)
-                },
+                }
                 2 => {
                     *MBUTTON_STATE.lock().unwrap() = false;
                     mouse_release_middle();
                     Some(ReleaseMButton)
-                },
+                }
                 3 => {
                     *RBUTTON_STATE.lock().unwrap() = false;
                     mouse_release_right();
                     Some(ReleaseRButton)
-                },
+                }
                 _ => None,
             }
         }
@@ -278,8 +278,8 @@ pub fn num_lock_is_toggled() -> bool {
         XGetKeyboardControl(display, &mut state);
     });
     (state.led_mask & 2 != 0)
-}                                                 
-                                                             
+}
+
 
 pub fn caps_lock_is_toggled() -> bool {
     let mut state: XKeyboardState = unsafe { uninitialized() };
@@ -299,13 +299,13 @@ pub fn is_pressed(code: u64) -> bool {
 }
 
 pub fn is_pressed_lbutton() -> bool {
-    unsafe{*LBUTTON_STATE.lock().unwrap()}
+    unsafe { *LBUTTON_STATE.lock().unwrap() }
 }
 
 pub fn is_pressed_mbutton() -> bool {
-    unsafe{*MBUTTON_STATE.lock().unwrap()}
+    unsafe { *MBUTTON_STATE.lock().unwrap() }
 }
 
 pub fn is_pressed_rbutton() -> bool {
-    unsafe{*RBUTTON_STATE.lock().unwrap()}
+    unsafe { *RBUTTON_STATE.lock().unwrap() }
 }
