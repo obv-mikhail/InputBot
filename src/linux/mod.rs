@@ -183,7 +183,7 @@ lazy_static! {
     }};
 }
 
-pub unsafe fn handle_event() {
+unsafe fn handle_event() {
     let mut ev = uninitialized();
     with_display2(|display| {
         XNextEvent(display, &mut ev);
