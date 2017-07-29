@@ -3,8 +3,9 @@ extern crate x11;
 use self::x11::xlib::*;
 use self::x11::xtest::*;
 use std::mem::{uninitialized, transmute};
-use ::*;
 use std::thread::spawn;
+use std::ptr::null;
+use ::*;
 
 pub mod inputs;
 
@@ -14,6 +15,18 @@ lazy_static! {
     static ref RBUTTON_STATE: Arc<Mutex<bool>> = Arc::new(Mutex::new(false));
     static ref KEYBD_BINDS: Arc<Mutex<HashMap<u64, Arc<Fn() + Send + Sync + 'static>>>> = Arc::new(Mutex::new(HashMap::<u64, Arc<Fn() + Send + Sync + 'static>>::new()));
     static ref MOUSE_BINDS: Arc<Mutex<HashMap<MouseButton, Arc<Fn() + Send + Sync + 'static>>>> = Arc::new(Mutex::new(HashMap::<MouseButton, Arc<Fn() + Send + Sync + 'static>>::new()));
+    static ref SEND_DISPLAY: Arc<Mutex<u64>> = {
+        unsafe{
+            XInitThreads();
+            Arc::new(Mutex::new(XOpenDisplay(null()) as u64))
+        }
+    };
+    static ref RECV_DISPLAY: Arc<Mutex<u64>> = {
+        unsafe{
+            XInitThreads();
+            Arc::new(Mutex::new(XOpenDisplay(null()) as u64))
+        }
+    };
 }
 
 impl KeybdKey {
@@ -23,7 +36,7 @@ impl KeybdKey {
     {
         let input = get_key_code(self as u64) as u64;
         KEYBD_BINDS.lock().unwrap().insert(input, Arc::new(callback));
-        with_display2(|display| {
+        with_recv_display(|display| {
             let window = unsafe {XDefaultRootWindow(display)};
             unsafe{XGrabKey(
                 display,
@@ -44,7 +57,7 @@ impl KeybdKey {
                 GrabModeAsync,
             )};
         });
-        if KEYBD_BINDS.lock().unwrap().len() != 1 {
+        if (KEYBD_BINDS.lock().unwrap().len() + MOUSE_BINDS.lock().unwrap().len()) != 1 {
             return;
         };
         spawn(move || while KEYBD_BINDS.lock().unwrap().len() != 0 {
@@ -60,7 +73,7 @@ impl KeybdKey {
     pub fn is_pressed(self) -> bool {
         let code = get_key_code(self as _);
         let mut array: [i8; 32] = [0; 32];
-        with_display(|display| unsafe {
+        with_send_display(|display| unsafe {
             XQueryKeymap(display, transmute(&mut array));
         });
         array[(code >> 3) as usize] & (1 << (code & 7)) != 0
@@ -81,14 +94,11 @@ impl MouseButton {
         F: Fn() + Send + Sync + 'static,
     {
         MOUSE_BINDS.lock().unwrap().insert(self, Arc::new(callback));
-        with_display2(|display| {
+        with_recv_display(|display| {
             let window = unsafe{XDefaultRootWindow(display)};
             grab_button(self as _, display, window);
         });
-        if KEYBD_BINDS.lock().unwrap().len() != 1 {
-            return;
-        };
-        if MOUSE_BINDS.lock().unwrap().len() != 1 {
+        if (KEYBD_BINDS.lock().unwrap().len() + MOUSE_BINDS.lock().unwrap().len()) != 1 {
             return;
         };
         spawn(move || while KEYBD_BINDS.lock().unwrap().len() != 0 {
@@ -121,15 +131,15 @@ impl MouseButton {
 
 fn get_key_code(code: u64) -> u8 {
     let mut key_code = 0;
-    with_display(|display| key_code = unsafe { XKeysymToKeycode(display, code) });
+    with_send_display(|display| key_code = unsafe { XKeysymToKeycode(display, code) });
     key_code
 }
 
-fn with_display<F>(cb: F)
+fn with_send_display<F>(cb: F)
 where
     F: FnOnce(*mut Display),
 {
-    let display = *STATE.lock().unwrap() as *mut Display;
+    let display = *SEND_DISPLAY.lock().unwrap() as *mut Display;
     unsafe {
         XLockDisplay(display);
     };
@@ -140,19 +150,19 @@ where
     };
 }
 
-fn with_display2<F>(cb: F)
+fn with_recv_display<F>(cb: F)
 where
     F: FnOnce(*mut Display),
 {
-    let display = *STATE2.lock().unwrap() as *mut Display;
+    let display = *RECV_DISPLAY.lock().unwrap() as *mut Display;
     unsafe {
         XLockDisplay(display);
     };
     cb(display);
     unsafe {
         XUnlockDisplay(display);
+        XFlush(display) 
     };
-    unsafe { XFlush(display) };
 }
 
 fn grab_button(button: u32, display: *mut Display, window: u64) {
@@ -172,20 +182,9 @@ fn grab_button(button: u32, display: *mut Display, window: u64) {
     }
 }
 
-lazy_static! {
-    static ref STATE: Arc<Mutex<u64>> = {unsafe{
-        XInitThreads();
-        Arc::new(Mutex::new(XOpenDisplay(std::ptr::null()) as u64))
-    }};
-    static ref STATE2: Arc<Mutex<u64>> = {unsafe{
-        XInitThreads();
-        Arc::new(Mutex::new(XOpenDisplay(std::ptr::null()) as u64))
-    }};
-}
-
 unsafe fn handle_event() {
     let mut ev = uninitialized();
-    with_display2(|display| {
+    with_recv_display(|display| {
         XNextEvent(display, &mut ev);
     });
     let mut keybd_key: Option<u64> = None;
@@ -236,40 +235,32 @@ unsafe fn handle_event() {
 }
 
 pub fn mouse_move_to(x: i32, y: i32) {
-    with_display(|display| unsafe {
+    with_send_display(|display| unsafe {
         XWarpPointer(display, 0, 0, 0, 0, 0, 0, x, y);
     });
 }
 
 pub fn mouse_move(x: i32, y: i32) {
-    with_display(|display| unsafe {
+    with_send_display(|display| unsafe {
         XWarpPointer(display, 0, 0, 0, 0, 0, 0, x, y);
     });
 }
 
 fn send_mouse_input(button: u32, is_press: i32) {
-    with_display(|display| unsafe {
+    with_send_display(|display| unsafe {
         XTestFakeButtonEvent(display, button, is_press, 0);
     });
 }
 
 fn send_keybd_input(code: u8, is_press: i32) {
-    with_display(|display| unsafe {
+    with_send_display(|display| unsafe {
         XTestFakeKeyEvent(display, code as u32, is_press, 0);
     });
 }
 
-pub fn keybd_press(code: u64) {
-    send_keybd_input(get_key_code(code), 1);
-}
-
-pub fn keybd_release(code: u64) {
-    send_keybd_input(get_key_code(code), 0);
-}
-
 pub fn num_lock_is_toggled() -> bool {
     let mut state: XKeyboardState = unsafe { uninitialized() };
-    with_display(|display| unsafe {
+    with_send_display(|display| unsafe {
         XGetKeyboardControl(display, &mut state);
     });
     (state.led_mask & 2 != 0)
@@ -278,7 +269,7 @@ pub fn num_lock_is_toggled() -> bool {
 
 pub fn caps_lock_is_toggled() -> bool {
     let mut state: XKeyboardState = unsafe { uninitialized() };
-    with_display(|display| unsafe {
+    with_send_display(|display| unsafe {
         XGetKeyboardControl(display, &mut state);
     });
     (state.led_mask & 1 != 0)
