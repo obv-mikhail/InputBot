@@ -1,5 +1,5 @@
 # InputBot [![docs link](https://docs.rs/inputbot/badge.svg)](https://docs.rs/inputbot) [![crates.io version](https://img.shields.io/crates/v/inputbot.svg)](https://crates.io/crates/inputbot) 
-A very small AutoHotkey inspired library for creating global hotkeys, as well as emulating mouse and keyboard input. Works on Windows and X11 Linux.
+A very small AutoHotkey inspired library for creating global hotkeys, as well as emulating mouse and keyboard input. Works on Windows and X11 Linux. Unlike AutoHotkey, can handle multiple hotkeys concurrently in one process.
 
 # How-To
 The code below demonstrates how to create some simple hotkeys.
