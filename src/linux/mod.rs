@@ -182,6 +182,7 @@ fn grab_button(button: u32, display: *mut Display, window: u64) {
     }
 }
 
+#[allow(non_upper_case_globals)]
 unsafe fn handle_event() {
     let mut ev = uninitialized();
     with_recv_display(|display| {
