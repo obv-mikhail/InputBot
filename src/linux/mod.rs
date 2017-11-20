@@ -233,7 +233,7 @@ unsafe fn handle_event() {
     if let Some(event) = keybd_key {
         if let Some(cb) = KEYBD_BINDS.lock().unwrap().get_mut(&event) {
             let cb = Arc::clone(cb);
-            spawn(cb);
+            spawn(move || cb());
         };
     }
     if let Some(event) = mouse_button {
