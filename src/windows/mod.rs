@@ -1,10 +1,10 @@
-extern crate winapi;
 extern crate user32;
+extern crate winapi;
 
 use self::winapi::*;
 use self::user32::*;
 use ::*;
-use std::mem::{transmute_copy, transmute, size_of, uninitialized};
+use std::mem::{size_of, transmute, transmute_copy, uninitialized};
 use std::cell::RefCell;
 use std::thread::spawn;
 
@@ -12,8 +12,10 @@ pub mod inputs;
 
 unsafe extern "system" fn keybd_proc(code: c_int, w_param: WPARAM, l_param: LPARAM) -> LRESULT {
     if KEYBD_BINDS.lock().unwrap().len() == 0 {
-        KEYBD_HHOOK.with(|hhook| if let Some(hhook) = *hhook.as_ptr() {
-            UnhookWindowsHookEx(hhook);
+        KEYBD_HHOOK.with(|hhook| {
+            if let Some(hhook) = *hhook.as_ptr() {
+                UnhookWindowsHookEx(hhook);
+            }
         });
     };
     if let Some(event) = match w_param as u32 {
@@ -32,8 +34,10 @@ unsafe extern "system" fn keybd_proc(code: c_int, w_param: WPARAM, l_param: LPAR
 
 unsafe extern "system" fn mouse_proc(code: c_int, w_param: WPARAM, l_param: LPARAM) -> LRESULT {
     if MOUSE_BINDS.lock().unwrap().len() == 0 {
-        MOUSE_HHOOK.with(|hhook| if let Some(hhook) = *hhook.as_ptr() {
-            UnhookWindowsHookEx(hhook);
+        MOUSE_HHOOK.with(|hhook| {
+            if let Some(hhook) = *hhook.as_ptr() {
+                UnhookWindowsHookEx(hhook);
+            }
         });
     };
     if let Some(event) = match w_param as u32 {

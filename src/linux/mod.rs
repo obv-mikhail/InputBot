@@ -2,7 +2,7 @@ extern crate x11;
 
 use self::x11::xlib::*;
 use self::x11::xtest::*;
-use std::mem::{uninitialized, transmute};
+use std::mem::{transmute, uninitialized};
 use std::thread::spawn;
 use std::ptr::null;
 use ::*;
@@ -35,33 +35,42 @@ impl KeybdKey {
         F: Fn() + Send + Sync + 'static,
     {
         let input = get_key_code(self as u64) as u64;
-        KEYBD_BINDS.lock().unwrap().insert(input, Arc::new(callback));
+        KEYBD_BINDS
+            .lock()
+            .unwrap()
+            .insert(input, Arc::new(callback));
         with_recv_display(|display| {
-            let window = unsafe {XDefaultRootWindow(display)};
-            unsafe{XGrabKey(
-                display,
-                input as i32,
-                ShiftMask,
-                window,
-                0,
-                GrabModeAsync,
-                GrabModeAsync,
-            )};
-            unsafe{XGrabKey(
-                display,
-                input as i32,
-                0,
-                window,
-                0,
-                GrabModeAsync,
-                GrabModeAsync,
-            )};
+            let window = unsafe { XDefaultRootWindow(display) };
+            unsafe {
+                XGrabKey(
+                    display,
+                    input as i32,
+                    ShiftMask,
+                    window,
+                    0,
+                    GrabModeAsync,
+                    GrabModeAsync,
+                )
+            };
+            unsafe {
+                XGrabKey(
+                    display,
+                    input as i32,
+                    0,
+                    window,
+                    0,
+                    GrabModeAsync,
+                    GrabModeAsync,
+                )
+            };
         });
         if (KEYBD_BINDS.lock().unwrap().len() + MOUSE_BINDS.lock().unwrap().len()) != 1 {
             return;
         };
-        spawn(move || while KEYBD_BINDS.lock().unwrap().len() != 0 {
-            unsafe{handle_event()};
+        spawn(move || {
+            while KEYBD_BINDS.lock().unwrap().len() != 0 {
+                unsafe { handle_event() };
+            }
         });
     }
 
@@ -95,14 +104,16 @@ impl MouseButton {
     {
         MOUSE_BINDS.lock().unwrap().insert(self, Arc::new(callback));
         with_recv_display(|display| {
-            let window = unsafe{XDefaultRootWindow(display)};
+            let window = unsafe { XDefaultRootWindow(display) };
             grab_button(self as _, display, window);
         });
         if (KEYBD_BINDS.lock().unwrap().len() + MOUSE_BINDS.lock().unwrap().len()) != 1 {
             return;
         };
-        spawn(move || while KEYBD_BINDS.lock().unwrap().len() != 0 {
-            unsafe{handle_event()};
+        spawn(move || {
+            while KEYBD_BINDS.lock().unwrap().len() != 0 {
+                unsafe { handle_event() };
+            }
         });
     }
 
@@ -116,7 +127,7 @@ impl MouseButton {
             MouseButton::LeftButton => *LBUTTON_STATE.lock().unwrap(),
             MouseButton::RightButton => *RBUTTON_STATE.lock().unwrap(),
             MouseButton::MiddleButton => *MBUTTON_STATE.lock().unwrap(),
-            _ => false
+            _ => false,
         }
     }
 
@@ -131,7 +142,9 @@ impl MouseButton {
 
 fn get_key_code(code: u64) -> u8 {
     let mut key_code = 0;
-    with_send_display(|display| key_code = unsafe { XKeysymToKeycode(display, code) });
+    with_send_display(|display| {
+        key_code = unsafe { XKeysymToKeycode(display, code) }
+    });
     key_code
 }
 
@@ -146,7 +159,7 @@ where
     cb(display);
     unsafe {
         XUnlockDisplay(display);
-        XFlush(display) 
+        XFlush(display)
     };
 }
 
@@ -161,7 +174,7 @@ where
     cb(display);
     unsafe {
         XUnlockDisplay(display);
-        XFlush(display) 
+        XFlush(display)
     };
 }
 
@@ -191,35 +204,29 @@ unsafe fn handle_event() {
     let mut keybd_key: Option<u64> = None;
     let mut mouse_button: Option<MouseButton> = None;
     match ev.get_type() {
-        KeyPress => keybd_key = Some(
-            (ev.as_ref() as &XKeyEvent).keycode as u64
-        ),
-        ButtonPress => {
-            match (ev.as_ref() as &XKeyEvent).keycode {
-                1 => {
-                    *LBUTTON_STATE.lock().unwrap() = true;
-                    mouse_button = Some(MouseButton::LeftButton)
-                },
-                2 => {
-                    *MBUTTON_STATE.lock().unwrap() = true;
-                    mouse_button = Some(MouseButton::MiddleButton)
-                },
-                3 => {
-                    *RBUTTON_STATE.lock().unwrap() = true;
-                    mouse_button = Some(MouseButton::RightButton)
-                },
-                _ => {},
+        KeyPress => keybd_key = Some((ev.as_ref() as &XKeyEvent).keycode as u64),
+        ButtonPress => match (ev.as_ref() as &XKeyEvent).keycode {
+            1 => {
+                *LBUTTON_STATE.lock().unwrap() = true;
+                mouse_button = Some(MouseButton::LeftButton)
             }
-        }
-        ButtonRelease => {
-            match (ev.as_ref() as &XKeyEvent).keycode {
-                1 => *LBUTTON_STATE.lock().unwrap() = false,
-                2 => *MBUTTON_STATE.lock().unwrap() = false,
-                3 => *RBUTTON_STATE.lock().unwrap() = false,
-                _ => {},
+            2 => {
+                *MBUTTON_STATE.lock().unwrap() = true;
+                mouse_button = Some(MouseButton::MiddleButton)
             }
-        }
-        _ => {},
+            3 => {
+                *RBUTTON_STATE.lock().unwrap() = true;
+                mouse_button = Some(MouseButton::RightButton)
+            }
+            _ => {}
+        },
+        ButtonRelease => match (ev.as_ref() as &XKeyEvent).keycode {
+            1 => *LBUTTON_STATE.lock().unwrap() = false,
+            2 => *MBUTTON_STATE.lock().unwrap() = false,
+            3 => *RBUTTON_STATE.lock().unwrap() = false,
+            _ => {}
+        },
+        _ => {}
     };
     if let Some(event) = keybd_key {
         if let Some(cb) = KEYBD_BINDS.lock().unwrap().get_mut(&event) {
