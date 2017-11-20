@@ -3,8 +3,7 @@ extern crate x11;
 use self::x11::xlib::*;
 use self::x11::xtest::*;
 use std::mem::uninitialized;
-use std::sync::atomic::AtomicBool;
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicBool, AtomicPtr, Ordering};
 use std::thread::spawn;
 use std::ptr::null;
 use ::*;
@@ -20,17 +19,13 @@ lazy_static! {
     static ref RBUTTON_STATE: AtomicBool = AtomicBool::new(false);
     static ref KEYBD_BINDS: KeybdBindMap = Mutex::new(HashMap::<u64, Arc<Fn() + Send + Sync + 'static>>::new());
     static ref MOUSE_BINDS: MouseBindMap = Mutex::new(HashMap::<MouseButton, Arc<Fn() + Send + Sync + 'static>>::new());
-    static ref SEND_DISPLAY: Arc<Mutex<u64>> = {
-        unsafe{
-            XInitThreads();
-            Arc::new(Mutex::new(XOpenDisplay(null()) as u64))
-        }
+    static ref SEND_DISPLAY: AtomicPtr<Display> = {
+        unsafe { XInitThreads() };
+        AtomicPtr::new(unsafe { XOpenDisplay(null()) })
     };
-    static ref RECV_DISPLAY: Arc<Mutex<u64>> = {
-        unsafe{
-            XInitThreads();
-            Arc::new(Mutex::new(XOpenDisplay(null()) as u64))
-        }
+    static ref RECV_DISPLAY: AtomicPtr<Display> = {
+        unsafe { XInitThreads() };
+        AtomicPtr::new(unsafe { XOpenDisplay(null()) })
     };
 }
 
@@ -46,28 +41,8 @@ impl KeybdKey {
             .insert(input, Arc::new(callback));
         with_recv_display(|display| {
             let window = unsafe { XDefaultRootWindow(display) };
-            unsafe {
-                XGrabKey(
-                    display,
-                    input as i32,
-                    ShiftMask,
-                    window,
-                    0,
-                    GrabModeAsync,
-                    GrabModeAsync,
-                )
-            };
-            unsafe {
-                XGrabKey(
-                    display,
-                    input as i32,
-                    0,
-                    window,
-                    0,
-                    GrabModeAsync,
-                    GrabModeAsync,
-                )
-            };
+            grab_key(input as i32, ShiftMask, display, window);
+            grab_key(input as i32, 0, display, window);
         });
         if (KEYBD_BINDS.lock().unwrap().len() + MOUSE_BINDS.lock().unwrap().len()) != 1 {
             return;
@@ -153,31 +128,32 @@ fn with_send_display<F, Z>(cb: F) -> Z
 where
     F: FnOnce(*mut Display) -> Z,
 {
-    let display = *SEND_DISPLAY.lock().unwrap() as *mut Display;
+    let display = SEND_DISPLAY.load(Ordering::Relaxed);
     unsafe {
         XLockDisplay(display);
     };
     let cb_result = cb(display);
     unsafe {
+        XFlush(display);
         XUnlockDisplay(display);
-        XFlush(display)
     };
     cb_result
 }
 
-fn with_recv_display<F>(cb: F)
+fn with_recv_display<F, Z>(cb: F) -> Z
 where
-    F: FnOnce(*mut Display),
+    F: FnOnce(*mut Display) -> Z,
 {
-    let display = *RECV_DISPLAY.lock().unwrap() as *mut Display;
+    let display = RECV_DISPLAY.load(Ordering::Relaxed);
     unsafe {
         XLockDisplay(display);
     };
-    cb(display);
+    let cb_result = cb(display);
     unsafe {
+        XFlush(display);
         XUnlockDisplay(display);
-        XFlush(display)
     };
+    cb_result
 }
 
 fn grab_button(button: u32, display: *mut Display, window: u64) {
@@ -193,6 +169,20 @@ fn grab_button(button: u32, display: *mut Display, window: u64) {
             GrabModeAsync,
             0,
             0,
+        );
+    }
+}
+
+fn grab_key(key: i32, mask: u32, display: *mut Display, window: u64) {
+    unsafe {
+        XGrabKey(
+            display,
+            key,
+            mask,
+            window,
+            0,
+            GrabModeAsync,
+            GrabModeAsync,
         );
     }
 }
