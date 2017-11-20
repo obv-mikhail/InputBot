@@ -39,7 +39,7 @@ impl KeybdKey {
             .lock()
             .unwrap()
             .insert(input, Arc::new(callback));
-        with_recv_display(|display| {
+        RECV_DISPLAY.with(|display| {
             let window = unsafe { XDefaultRootWindow(display) };
             grab_key(input as i32, ShiftMask, display, window);
             grab_key(input as i32, 0, display, window);
@@ -62,7 +62,7 @@ impl KeybdKey {
     pub fn is_pressed(self) -> bool {
         let code = get_key_code(self as _);
         let mut array: [i8; 32] = [0; 32];
-        with_send_display(|display| unsafe {
+        SEND_DISPLAY.with(|display| unsafe {
             XQueryKeymap(display, &mut array as *mut [i8; 32] as *mut i8);
         });
         array[(code >> 3) as usize] & (1 << (code & 7)) != 0
@@ -83,7 +83,7 @@ impl MouseButton {
         F: Fn() + Send + Sync + 'static,
     {
         MOUSE_BINDS.lock().unwrap().insert(self, Arc::new(callback));
-        with_recv_display(|display| {
+        RECV_DISPLAY.with(|display| {
             let window = unsafe { XDefaultRootWindow(display) };
             grab_button(self as _, display, window);
         });
@@ -121,39 +121,31 @@ impl MouseButton {
 }
 
 fn get_key_code(code: u64) -> u8 {
-    with_send_display(|display| unsafe { XKeysymToKeycode(display, code) })
+    SEND_DISPLAY.with(|display| unsafe { XKeysymToKeycode(display, code) })
 }
 
-fn with_send_display<F, Z>(cb: F) -> Z
-where
-    F: FnOnce(*mut Display) -> Z,
-{
-    let display = SEND_DISPLAY.load(Ordering::Relaxed);
-    unsafe {
-        XLockDisplay(display);
-    };
-    let cb_result = cb(display);
-    unsafe {
-        XFlush(display);
-        XUnlockDisplay(display);
-    };
-    cb_result
+trait DisplayAcquirable {
+    fn with<F, Z>(&self, cb: F) -> Z
+    where
+        F: FnOnce(*mut Display) -> Z;
 }
 
-fn with_recv_display<F, Z>(cb: F) -> Z
-where
-    F: FnOnce(*mut Display) -> Z,
-{
-    let display = RECV_DISPLAY.load(Ordering::Relaxed);
-    unsafe {
-        XLockDisplay(display);
-    };
-    let cb_result = cb(display);
-    unsafe {
-        XFlush(display);
-        XUnlockDisplay(display);
-    };
-    cb_result
+impl DisplayAcquirable for AtomicPtr<Display> {
+    fn with<F, Z>(&self, cb: F) -> Z
+    where
+        F: FnOnce(*mut Display) -> Z,
+    {
+        let display = self.load(Ordering::Relaxed);
+        unsafe {
+            XLockDisplay(display);
+        };
+        let cb_result = cb(display);
+        unsafe {
+            XFlush(display);
+            XUnlockDisplay(display);
+        };
+        cb_result
+    }
 }
 
 fn grab_button(button: u32, display: *mut Display, window: u64) {
@@ -175,22 +167,14 @@ fn grab_button(button: u32, display: *mut Display, window: u64) {
 
 fn grab_key(key: i32, mask: u32, display: *mut Display, window: u64) {
     unsafe {
-        XGrabKey(
-            display,
-            key,
-            mask,
-            window,
-            0,
-            GrabModeAsync,
-            GrabModeAsync,
-        );
+        XGrabKey(display, key, mask, window, 0, GrabModeAsync, GrabModeAsync);
     }
 }
 
 #[allow(non_upper_case_globals)]
 unsafe fn handle_event() {
     let mut ev = uninitialized();
-    with_recv_display(|display| {
+    RECV_DISPLAY.with(|display| {
         XNextEvent(display, &mut ev);
     });
     let mut keybd_key: Option<u64> = None;
@@ -235,41 +219,40 @@ unsafe fn handle_event() {
 }
 
 pub fn mouse_move_to(x: i32, y: i32) {
-    with_send_display(|display| unsafe {
+    SEND_DISPLAY.with(|display| unsafe {
         XWarpPointer(display, 0, 0, 0, 0, 0, 0, x, y);
     });
 }
 
 pub fn mouse_move(x: i32, y: i32) {
-    with_send_display(|display| unsafe {
+    SEND_DISPLAY.with(|display| unsafe {
         XWarpPointer(display, 0, 0, 0, 0, 0, 0, x, y);
     });
 }
 
 fn send_mouse_input(button: u32, is_press: i32) {
-    with_send_display(|display| unsafe {
+    SEND_DISPLAY.with(|display| unsafe {
         XTestFakeButtonEvent(display, button, is_press, 0);
     });
 }
 
 fn send_keybd_input(code: u8, is_press: i32) {
-    with_send_display(|display| unsafe {
+    SEND_DISPLAY.with(|display| unsafe {
         XTestFakeKeyEvent(display, u32::from(code), is_press, 0);
     });
 }
 
 pub fn num_lock_is_toggled() -> bool {
     let mut state: XKeyboardState = unsafe { uninitialized() };
-    with_send_display(|display| unsafe {
+    SEND_DISPLAY.with(|display| unsafe {
         XGetKeyboardControl(display, &mut state);
     });
     (state.led_mask & 2 != 0)
 }
 
-
 pub fn caps_lock_is_toggled() -> bool {
     let mut state: XKeyboardState = unsafe { uninitialized() };
-    with_send_display(|display| unsafe {
+    SEND_DISPLAY.with(|display| unsafe {
         XGetKeyboardControl(display, &mut state);
     });
     (state.led_mask & 1 != 0)
