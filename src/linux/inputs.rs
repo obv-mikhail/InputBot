@@ -93,7 +93,7 @@ pub enum MouseButton {
 impl From<u32> for MouseButton {
     fn from(keycode: u32) -> MouseButton {
         match keycode {
-            Button1 => MouseButton::LeftButton,
+            1 => MouseButton::LeftButton,
             2 => MouseButton::MiddleButton,
             3 => MouseButton::RightButton,
             4 => MouseButton::MiddleButton,
