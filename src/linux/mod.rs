@@ -42,14 +42,7 @@ impl KeybdKey {
             grab_key(input as i32, ShiftMask, display, window);
             grab_key(input as i32, 0, display, window);
         });
-        if (KEYBD_BINDS.lock().unwrap().len() + MOUSE_BINDS.lock().unwrap().len()) != 1 {
-            return;
-        };
-        spawn(move || {
-            while !KEYBD_BINDS.lock().unwrap().is_empty() {
-                unsafe { handle_event() };
-            }
-        });
+        handle_events();
     }
 
     pub fn unbind(self) {
@@ -87,14 +80,7 @@ impl MouseButton {
             let window = unsafe { XDefaultRootWindow(display) };
             grab_button(u32::from(self), display, window);
         });
-        if (KEYBD_BINDS.lock().unwrap().len() + MOUSE_BINDS.lock().unwrap().len()) != 1 {
-            return;
-        };
-        spawn(move || {
-            while KEYBD_BINDS.lock().unwrap().len() != 0 {
-                unsafe { handle_event() };
-            }
-        });
+        handle_events();
     }
 
     pub fn unbind(self) {
@@ -165,21 +151,38 @@ fn grab_key(key: i32, mask: u32, display: *mut Display, window: u64) {
     }
 }
 
+fn handle_events() {
+    if (KEYBD_BINDS.lock().unwrap().len() + MOUSE_BINDS.lock().unwrap().len()) == 1 {
+        spawn(move || {
+            while (KEYBD_BINDS.lock().unwrap().len() + MOUSE_BINDS.lock().unwrap().len()) != 0 {
+                unsafe { handle_event() };
+            }
+        });
+    };
+}
+
 #[allow(non_upper_case_globals)]
 unsafe fn handle_event() {
     let mut ev = uninitialized();
-    RECV_DISPLAY.with(|display| {
-        XNextEvent(display, &mut ev);
-    });
-    let mut keybd_key: Option<u64> = None;
-    let mut mouse_button: Option<MouseButton> = None;
+    RECV_DISPLAY.with(|display| XNextEvent(display, &mut ev));
     match ev.get_type() {
-        KeyPress => keybd_key = Some(u64::from((ev.as_ref() as &XKeyEvent).keycode)),
+        KeyPress => {
+            if let Some(cb) = KEYBD_BINDS
+                .lock()
+                .unwrap()
+                .get_mut(&u64::from((ev.as_ref() as &XKeyEvent).keycode))
+            {
+                let cb = Arc::clone(cb);
+                spawn(move || cb());
+            };
+        }
         ButtonPress => {
-            mouse_button = Some(MouseButton::from((ev.as_ref() as &XKeyEvent).keycode));
-            if let Some(button) = mouse_button {
-                BUTTON_STATES.lock().unwrap().insert(button, true);
-            }
+            let mouse_button = MouseButton::from((ev.as_ref() as &XKeyEvent).keycode);
+            BUTTON_STATES.lock().unwrap().insert(mouse_button, true);
+            if let Some(cb) = MOUSE_BINDS.lock().unwrap().get_mut(&mouse_button) {
+                let cb = Arc::clone(cb);
+                spawn(move || cb());
+            };
         }
         ButtonRelease => {
             BUTTON_STATES.lock().unwrap().insert(
@@ -189,18 +192,6 @@ unsafe fn handle_event() {
         }
         _ => {}
     };
-    if let Some(event) = keybd_key {
-        if let Some(cb) = KEYBD_BINDS.lock().unwrap().get_mut(&event) {
-            let cb = Arc::clone(cb);
-            spawn(move || cb());
-        };
-    }
-    if let Some(event) = mouse_button {
-        if let Some(cb) = MOUSE_BINDS.lock().unwrap().get_mut(&event) {
-            let cb = Arc::clone(cb);
-            spawn(move || cb());
-        };
-    }
 }
 
 pub fn mouse_move_to(x: i32, y: i32) {
