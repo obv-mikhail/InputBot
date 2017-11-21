@@ -96,8 +96,8 @@ impl From<u32> for MouseButton {
             1 => MouseButton::LeftButton,
             2 => MouseButton::MiddleButton,
             3 => MouseButton::RightButton,
-            4 => MouseButton::MiddleButton,
-            5 => MouseButton::RightButton,
+            4 => MouseButton::X1Button,
+            5 => MouseButton::X2Button,
             _ => MouseButton::OtherButton(keycode),
         }
     }
