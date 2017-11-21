@@ -55,8 +55,8 @@ unsafe extern "system" fn mouse_proc(code: c_int, w_param: WPARAM, l_param: LPAR
 }
 
 lazy_static! {
-    static ref KEYBD_BINDS: Arc<Mutex<HashMap<KeybdKey, Arc<Fn() + Send + Sync + 'static>>>> = Arc::new(Mutex::new(HashMap::<KeybdKey, Arc<Fn() + Send + Sync + 'static>>::new()));
-    static ref MOUSE_BINDS: Arc<Mutex<HashMap<MouseButton, Arc<Fn() + Send + Sync + 'static>>>> = Arc::new(Mutex::new(HashMap::<MouseButton, Arc<Fn() + Send + Sync + 'static>>::new()));
+    static ref KEYBD_BINDS: Mutex<HashMap<KeybdKey, Arc<Fn() + Send + Sync + 'static>>> = Mutex::new(HashMap::<KeybdKey, Arc<Fn() + Send + Sync + 'static>>::new());
+    static ref MOUSE_BINDS: Mutex<HashMap<MouseButton, Arc<Fn() + Send + Sync + 'static>>> = Mutex::new(HashMap::<MouseButton, Arc<Fn() + Send + Sync + 'static>>::new());
 }
 
 thread_local! {
@@ -92,10 +92,7 @@ impl KeybdKey {
     }
 
     pub fn is_pressed(self) -> bool {
-        match unsafe { GetAsyncKeyState(self as i32) } {
-            -32767 | -32768 => true,
-            _ => false,
-        }
+        (unsafe { GetAsyncKeyState(self as i32) } >> 15) != 0
     }
 
     pub fn press(self) {
@@ -135,10 +132,7 @@ impl MouseButton {
     }
 
     pub fn is_pressed(self) -> bool {
-        match unsafe { GetAsyncKeyState(self as _) } {
-            -32767 | -32768 => true,
-            _ => false,
-        }
+        (unsafe { GetAsyncKeyState(self as i32) } >> 15) != 0
     }
 
     pub fn press(self) {
@@ -202,8 +196,8 @@ pub fn mouse_move_to(x: i32, y: i32) {
         send_mouse_input(
             MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE,
             0,
-            x * 65335 / GetSystemMetrics(78),
-            y * 65335 / GetSystemMetrics(79),
+            x * 65_335 / GetSystemMetrics(78),
+            y * 65_335 / GetSystemMetrics(79),
         )
     };
 }
