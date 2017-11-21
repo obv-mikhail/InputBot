@@ -3,7 +3,7 @@ extern crate x11;
 use self::x11::xlib::*;
 use self::x11::xtest::*;
 use std::mem::uninitialized;
-use std::sync::atomic::{AtomicBool, AtomicPtr, Ordering};
+use std::sync::atomic::{AtomicPtr, Ordering};
 use std::thread::spawn;
 use std::ptr::null;
 use ::*;
@@ -14,9 +14,7 @@ type KeybdBindMap = Mutex<HashMap<u64, Arc<Fn() + Send + Sync + 'static>>>;
 type MouseBindMap = Mutex<HashMap<MouseButton, Arc<Fn() + Send + Sync + 'static>>>;
 
 lazy_static! {
-    static ref LBUTTON_STATE: AtomicBool = AtomicBool::new(false);
-    static ref MBUTTON_STATE: AtomicBool = AtomicBool::new(false);
-    static ref RBUTTON_STATE: AtomicBool = AtomicBool::new(false);
+    static ref BUTTON_STATES: Mutex<HashMap<MouseButton, bool>> = Mutex::new(HashMap::<MouseButton, bool>::new());
     static ref KEYBD_BINDS: KeybdBindMap = Mutex::new(HashMap::<u64, Arc<Fn() + Send + Sync + 'static>>::new());
     static ref MOUSE_BINDS: MouseBindMap = Mutex::new(HashMap::<MouseButton, Arc<Fn() + Send + Sync + 'static>>::new());
     static ref SEND_DISPLAY: AtomicPtr<Display> = {
@@ -48,7 +46,7 @@ impl KeybdKey {
             return;
         };
         spawn(move || {
-            while KEYBD_BINDS.lock().unwrap().len() != 0 {
+            while !KEYBD_BINDS.lock().unwrap().is_empty() {
                 unsafe { handle_event() };
             }
         });
@@ -103,12 +101,7 @@ impl MouseButton {
     }
 
     pub fn is_pressed(self) -> bool {
-        match self {
-            MouseButton::LeftButton => LBUTTON_STATE.load(Ordering::Relaxed),
-            MouseButton::RightButton => RBUTTON_STATE.load(Ordering::Relaxed),
-            MouseButton::MiddleButton => MBUTTON_STATE.load(Ordering::Relaxed),
-            _ => false,
-        }
+        *BUTTON_STATES.lock().unwrap().entry(self).or_insert(false)
     }
 
     pub fn press(self) {
@@ -181,27 +174,18 @@ unsafe fn handle_event() {
     let mut mouse_button: Option<MouseButton> = None;
     match ev.get_type() {
         KeyPress => keybd_key = Some(u64::from((ev.as_ref() as &XKeyEvent).keycode)),
-        ButtonPress => match (ev.as_ref() as &XKeyEvent).keycode {
-            1 => {
-                LBUTTON_STATE.store(true, Ordering::Relaxed);
-                mouse_button = Some(MouseButton::LeftButton)
+        ButtonPress => {
+            mouse_button = Some(MouseButton::from((ev.as_ref() as &XKeyEvent).keycode));
+            if let Some(button) = mouse_button {
+                BUTTON_STATES.lock().unwrap().insert(button, true);
             }
-            2 => {
-                MBUTTON_STATE.store(true, Ordering::Relaxed);
-                mouse_button = Some(MouseButton::MiddleButton)
-            }
-            3 => {
-                RBUTTON_STATE.store(true, Ordering::Relaxed);
-                mouse_button = Some(MouseButton::RightButton)
-            }
-            _ => {}
-        },
-        ButtonRelease => match (ev.as_ref() as &XKeyEvent).keycode {
-            1 => LBUTTON_STATE.store(false, Ordering::Relaxed),
-            2 => MBUTTON_STATE.store(false, Ordering::Relaxed),
-            3 => RBUTTON_STATE.store(false, Ordering::Relaxed),
-            _ => {}
-        },
+        }
+        ButtonRelease => {
+            BUTTON_STATES.lock().unwrap().insert(
+                MouseButton::from((ev.as_ref() as &XKeyEvent).keycode),
+                false,
+            );
+        }
         _ => {}
     };
     if let Some(event) = keybd_key {
