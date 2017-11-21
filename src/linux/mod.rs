@@ -53,8 +53,10 @@ impl KeybdKey {
     }
 
     pub fn unbind(self) {
-        let input = u64::from(get_key_code(self as u64));
-        KEYBD_BINDS.lock().unwrap().remove(&input);
+        KEYBD_BINDS
+            .lock()
+            .unwrap()
+            .remove(&u64::from(get_key_code(self as u64)));
     }
 
     pub fn is_pressed(self) -> bool {
@@ -83,7 +85,7 @@ impl MouseButton {
         MOUSE_BINDS.lock().unwrap().insert(self, Arc::new(callback));
         RECV_DISPLAY.with(|display| {
             let window = unsafe { XDefaultRootWindow(display) };
-            grab_button(self as _, display, window);
+            grab_button(u32::from(self), display, window);
         });
         if (KEYBD_BINDS.lock().unwrap().len() + MOUSE_BINDS.lock().unwrap().len()) != 1 {
             return;
@@ -96,8 +98,7 @@ impl MouseButton {
     }
 
     pub fn unbind(self) {
-        let input = u64::from(get_key_code(self as u64));
-        KEYBD_BINDS.lock().unwrap().remove(&input);
+        MOUSE_BINDS.lock().unwrap().remove(&self);
     }
 
     pub fn is_pressed(self) -> bool {
@@ -105,11 +106,11 @@ impl MouseButton {
     }
 
     pub fn press(self) {
-        send_mouse_input(self as _, 1);
+        send_mouse_input(u32::from(self), 1);
     }
 
     pub fn release(self) {
-        send_mouse_input(self as _, 0);
+        send_mouse_input(u32::from(self), 0);
     }
 }
 
