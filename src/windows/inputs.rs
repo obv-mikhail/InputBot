@@ -80,12 +80,26 @@ pub enum KeybdKey {
     RControlKey = 0xA3,
 }
 
-#[repr(u32)]
 #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
 pub enum MouseButton {
-    LeftButton = 0x01,
-    RightButton = 0x02,
-    MiddleButton = 0x04,
-    X1Button = 0x05,
-    X2Button = 0x06,
+    LeftButton,
+    RightButton,
+    MiddleButton,
+    X1Button,
+    X2Button,
+    OtherButton(u32),
+}
+
+
+impl From<MouseButton> for u32 {
+    fn from(button: MouseButton) -> u32 {
+        match button {
+            MouseButton::LeftButton => 0x01,
+            MouseButton::RightButton => 0x02,
+            MouseButton::MiddleButton => 0x04,
+            MouseButton::X1Button => 0x05,
+            MouseButton::X2Button => 0x06,
+            MouseButton::OtherButton(code) => code, 
+        }
+    }
 }

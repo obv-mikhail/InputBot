@@ -11,7 +11,7 @@ use std::thread::spawn;
 pub mod inputs;
 
 unsafe extern "system" fn keybd_proc(code: c_int, w_param: WPARAM, l_param: LPARAM) -> LRESULT {
-    if KEYBD_BINDS.lock().unwrap().len() == 0 {
+    if KEYBD_BINDS.lock().unwrap().is_empty() {
         KEYBD_HHOOK.with(|hhook| {
             if let Some(hhook) = *hhook.as_ptr() {
                 UnhookWindowsHookEx(hhook);
@@ -25,7 +25,7 @@ unsafe extern "system" fn keybd_proc(code: c_int, w_param: WPARAM, l_param: LPAR
         _ => None,
     } {
         if let Some(cb) = KEYBD_BINDS.lock().unwrap().get_mut(&event) {
-            let cb = cb.clone();
+            let cb = Arc::clone(cb);
             spawn(move || cb());
         };
     }
@@ -33,7 +33,7 @@ unsafe extern "system" fn keybd_proc(code: c_int, w_param: WPARAM, l_param: LPAR
 }
 
 unsafe extern "system" fn mouse_proc(code: c_int, w_param: WPARAM, l_param: LPARAM) -> LRESULT {
-    if MOUSE_BINDS.lock().unwrap().len() == 0 {
+    if MOUSE_BINDS.lock().unwrap().is_empty() {
         MOUSE_HHOOK.with(|hhook| {
             if let Some(hhook) = *hhook.as_ptr() {
                 UnhookWindowsHookEx(hhook);
@@ -47,7 +47,7 @@ unsafe extern "system" fn mouse_proc(code: c_int, w_param: WPARAM, l_param: LPAR
         _ => None,
     } {
         if let Some(cb) = MOUSE_BINDS.lock().unwrap().get_mut(&event) {
-            let cb = cb.clone();
+            let cb = Arc::clone(cb);
             spawn(move || cb());
         };
     }
@@ -70,21 +70,20 @@ impl KeybdKey {
         F: Fn() + Send + Sync + 'static,
     {
         KEYBD_BINDS.lock().unwrap().insert(self, Arc::new(callback));
-        if KEYBD_BINDS.lock().unwrap().len() != 1 {
-            return;
-        };
-        spawn(move || unsafe {
-            KEYBD_HHOOK.with(|hhook| {
-                *hhook.as_ptr() = Some(SetWindowsHookExW(
-                    WH_KEYBOARD_LL,
-                    Some(keybd_proc),
-                    0 as HINSTANCE,
-                    0,
-                ))
+        if KEYBD_BINDS.lock().unwrap().len() == 1 {
+            spawn(move || unsafe {
+                KEYBD_HHOOK.with(|hhook| {
+                    *hhook.as_ptr() = Some(SetWindowsHookExW(
+                        WH_KEYBOARD_LL,
+                        Some(keybd_proc),
+                        0 as HINSTANCE,
+                        0,
+                    ))
+                });
+                let mut msg: MSG = uninitialized();
+                GetMessageW(&mut msg, 0 as HWND, 0, 0);
             });
-            let mut msg: MSG = uninitialized();
-            GetMessageW(&mut msg, 0 as HWND, 0, 0);
-        });
+        };
     }
 
     pub fn unbind(self) {
@@ -110,21 +109,20 @@ impl MouseButton {
         F: Fn() + Send + Sync + 'static,
     {
         MOUSE_BINDS.lock().unwrap().insert(self, Arc::new(callback));
-        if MOUSE_BINDS.lock().unwrap().len() != 1 {
-            return;
-        };
-        spawn(move || unsafe {
-            MOUSE_HHOOK.with(|hhook| {
-                *hhook.as_ptr() = Some(SetWindowsHookExW(
-                    WH_MOUSE_LL,
-                    Some(mouse_proc),
-                    0 as HINSTANCE,
-                    0,
-                ))
+        if MOUSE_BINDS.lock().unwrap().len() == 1 {
+            spawn(move || unsafe {
+                MOUSE_HHOOK.with(|hhook| {
+                    *hhook.as_ptr() = Some(SetWindowsHookExW(
+                        WH_MOUSE_LL,
+                        Some(mouse_proc),
+                        0 as HINSTANCE,
+                        0,
+                    ))
+                });
+                let mut msg: MSG = uninitialized();
+                GetMessageW(&mut msg, 0 as HWND, 0, 0);
             });
-            let mut msg: MSG = uninitialized();
-            GetMessageW(&mut msg, 0 as HWND, 0, 0);
-        });
+        };
     }
 
     pub fn unbind(self) {
@@ -132,7 +130,7 @@ impl MouseButton {
     }
 
     pub fn is_pressed(self) -> bool {
-        (unsafe { GetAsyncKeyState(self as i32) } >> 15) != 0
+        (unsafe { GetAsyncKeyState(u32::from(self) as i32) } >> 15) != 0
     }
 
     pub fn press(self) {
