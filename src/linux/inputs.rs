@@ -1,3 +1,5 @@
+use ::*;
+
 #[repr(u64)]
 #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
 pub enum KeybdKey {
@@ -78,16 +80,6 @@ pub enum KeybdKey {
     RShiftKey = 0xFFE2,
     LControlKey = 0xFFE3,
     RControlKey = 0xFFE4,
-}
-
-#[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
-pub enum MouseButton {
-    LeftButton,
-    MiddleButton,
-    RightButton,
-    X1Button,
-    X2Button,
-    OtherButton(u32),
 }
 
 impl From<u32> for MouseButton {

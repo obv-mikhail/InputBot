@@ -10,21 +10,12 @@ use ::*;
 
 pub mod inputs;
 
-#[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
-enum InputEvent {
-    ButtonPress(MouseButton),
-    KeyPress(KeybdKey),
-}
-
-type BindHandler = Arc<Fn() + Send + Sync + 'static>;
-type InputBindMap = Mutex<HashMap<InputEvent, BindHandler>>;
 type ButtonStatesMap = Mutex<HashMap<MouseButton, bool>>;
 type KeyCodesMap = Mutex<HashMap<u64, KeybdKey>>;
 
 lazy_static! {
     static ref KEYCODES_TO_KEYBDKEYS: KeyCodesMap = Mutex::new(HashMap::<u64, KeybdKey>::new());
     static ref BUTTON_STATES: ButtonStatesMap = Mutex::new(HashMap::<MouseButton, bool>::new());
-    static ref INPUT_BINDS: InputBindMap = Mutex::new(HashMap::<InputEvent, BindHandler>::new());
     static ref SEND_DISPLAY: AtomicPtr<Display> = {
         unsafe { XInitThreads() };
         AtomicPtr::new(unsafe { XOpenDisplay(null()) })
