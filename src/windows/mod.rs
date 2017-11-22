@@ -52,20 +52,22 @@ lazy_static! {
     static ref MOUSE_HHOOK: AtomicPtr<HHOOK__> = AtomicPtr::default();
 }
 
-fn set_hook(hook_id: i32, hook_ptr: &AtomicPtr<HHOOK__>, hook_proc: unsafe extern "system" fn(i32, u64, i64) -> i64) {
-    hook_ptr.store(unsafe{SetWindowsHookExW(
-        hook_id,
-        Some(hook_proc),
-        0 as HINSTANCE,
-        0,
-    )}, Ordering::Relaxed);
-    let mut msg: MSG = unsafe{uninitialized()};
-    unsafe{GetMessageW(&mut msg, 0 as HWND, 0, 0)};
+fn set_hook(
+    hook_id: i32,
+    hook_ptr: &AtomicPtr<HHOOK__>,
+    hook_proc: unsafe extern "system" fn(i32, u64, i64) -> i64,
+) {
+    hook_ptr.store(
+        unsafe { SetWindowsHookExW(hook_id, Some(hook_proc), 0 as HINSTANCE, 0) },
+        Ordering::Relaxed,
+    );
+    let mut msg: MSG = unsafe { uninitialized() };
+    unsafe { GetMessageW(&mut msg, 0 as HWND, 0, 0) };
 }
 
 fn unset_hook(hook_ptr: &AtomicPtr<HHOOK__>) {
     if !hook_ptr.load(Ordering::Relaxed).is_null() {
-        unsafe{ UnhookWindowsHookEx(hook_ptr.load(Ordering::Relaxed)) };
+        unsafe { UnhookWindowsHookEx(hook_ptr.load(Ordering::Relaxed)) };
         hook_ptr.store(null_mut(), Ordering::Relaxed);
     }
 }
@@ -76,7 +78,7 @@ impl KeybdKey {
         F: Fn() + Send + Sync + 'static,
     {
         KEYBD_BINDS.lock().unwrap().insert(self, Arc::new(callback));
-        if KEYBD_BINDS.lock().unwrap().len() == 1  {
+        if KEYBD_BINDS.lock().unwrap().len() == 1 {
             spawn(move || set_hook(WH_KEYBOARD_LL, &*KEYBD_HHOOK, keybd_proc));
         };
     }

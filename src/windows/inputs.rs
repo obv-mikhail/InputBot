@@ -99,7 +99,7 @@ impl From<MouseButton> for u32 {
             MouseButton::MiddleButton => 0x04,
             MouseButton::X1Button => 0x05,
             MouseButton::X2Button => 0x06,
-            MouseButton::OtherButton(code) => code, 
+            MouseButton::OtherButton(code) => code,
         }
     }
 }
