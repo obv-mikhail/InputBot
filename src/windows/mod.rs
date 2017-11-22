@@ -9,7 +9,8 @@ use std::thread::spawn;
 use std::sync::atomic::{AtomicPtr, Ordering};
 use std::ptr::null_mut;
 
-pub mod inputs;
+mod inputs;
+pub use self::inputs::*;
 
 unsafe extern "system" fn keybd_proc(code: c_int, w_param: WPARAM, l_param: LPARAM) -> LRESULT {
     if KEYBD_BINDS.lock().unwrap().is_empty() {
@@ -46,8 +47,8 @@ unsafe extern "system" fn mouse_proc(code: c_int, w_param: WPARAM, l_param: LPAR
 }
 
 lazy_static! {
-    static ref KEYBD_BINDS: Mutex<HashMap<KeybdKey, Arc<Fn() + Send + Sync + 'static>>> = Mutex::new(HashMap::<KeybdKey, Arc<Fn() + Send + Sync + 'static>>::new());
-    static ref MOUSE_BINDS: Mutex<HashMap<MouseButton, Arc<Fn() + Send + Sync + 'static>>> = Mutex::new(HashMap::<MouseButton, Arc<Fn() + Send + Sync + 'static>>::new());
+    static ref KEYBD_BINDS: Mutex<HashMap<KeybdKey, BindHandler>> = Mutex::new(HashMap::<KeybdKey, BindHandler>::new());
+    static ref MOUSE_BINDS: Mutex<HashMap<MouseButton, BindHandler>> = Mutex::new(HashMap::<MouseButton, BindHandler>::new());
     static ref KEYBD_HHOOK: AtomicPtr<HHOOK__> = AtomicPtr::default();
     static ref MOUSE_HHOOK: AtomicPtr<HHOOK__> = AtomicPtr::default();
 }
