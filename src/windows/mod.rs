@@ -13,13 +13,10 @@ pub use self::inputs::*;
 unsafe extern "system" fn keybd_proc(code: c_int, w_param: WPARAM, l_param: LPARAM) -> LRESULT {
     if KEYBD_BINDS.lock().unwrap().is_empty() {
         unset_hook(&*KEYBD_HHOOK);
-    } else if let Some(event) = match w_param as u32 {
-        WM_KEYDOWN => Some(transmute(
-            (*(l_param as *const KBDLLHOOKSTRUCT)).vkCode as u32,
-        )),
-        _ => None,
-    } {
-        if let Some(cb) = KEYBD_BINDS.lock().unwrap().get_mut(&event) {
+    } else if w_param as u32 == WM_KEYDOWN {
+        if let Some(cb) = KEYBD_BINDS.lock().unwrap().get_mut(&KeybdKey::from(
+            (*(l_param as *const KBDLLHOOKSTRUCT)).vkCode as u64,
+        )) {
             let cb = Arc::clone(cb);
             spawn(move || cb());
         }
@@ -69,7 +66,7 @@ fn unset_hook(hook_ptr: &AtomicPtr<HHOOK__>) {
 
 impl KeybdKey {
     pub fn is_pressed(self) -> bool {
-        (unsafe { GetAsyncKeyState(self as i32) } >> 15) != 0
+        (unsafe { GetAsyncKeyState(u64::from(self) as i32) } >> 15) != 0
     }
 
     pub fn press(self) {
@@ -139,7 +136,7 @@ fn send_keybd_input(flags: u32, key_code: KeybdKey) {
         u: unsafe {
             transmute_copy(&KEYBDINPUT {
                 wVk: 0,
-                wScan: MapVirtualKeyW(key_code as u32, 0) as u16,
+                wScan: MapVirtualKeyW(u64::from(key_code) as u32, 0) as u16,
                 dwFlags: flags,
                 time: 0,
                 dwExtraInfo: 0,
