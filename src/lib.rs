@@ -1,9 +1,6 @@
 #[macro_use]
 extern crate lazy_static;
 
-use std::sync::{Arc, Mutex};
-use std::collections::hash_map::HashMap;
-
 mod common;
 use common::*;
 

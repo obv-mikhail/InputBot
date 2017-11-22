@@ -3,8 +3,6 @@ extern crate x11;
 use self::x11::xlib::*;
 use self::x11::xtest::*;
 use std::mem::uninitialized;
-use std::sync::atomic::{AtomicPtr, Ordering};
-use std::thread::spawn;
 use std::ptr::null;
 use ::*;
 
@@ -28,19 +26,8 @@ lazy_static! {
 }
 
 impl KeybdKey {
-    pub fn bind<F>(self, callback: F)
-    where
-        F: Fn() + Send + Sync + 'static,
-    {
-        KEYBD_BINDS.lock().unwrap().insert(self, Arc::new(callback));
-    }
-
-    pub fn unbind(self) {
-        KEYBD_BINDS.lock().unwrap().remove(&self);
-    }
-
     pub fn is_pressed(self) -> bool {
-        let code = get_key_code(self as _);
+        let code = get_key_code(u64::from(self) as _);
         let mut array: [i8; 32] = [0; 32];
         SEND_DISPLAY.with(|display| unsafe {
             XQueryKeymap(display, &mut array as *mut [i8; 32] as *mut i8);
@@ -49,26 +36,15 @@ impl KeybdKey {
     }
 
     pub fn press(self) {
-        send_keybd_input(get_key_code(self as _), 1);
+        send_keybd_input(get_key_code(u64::from(self) as _), 1);
     }
 
     pub fn release(self) {
-        send_keybd_input(get_key_code(self as _), 0);
+        send_keybd_input(get_key_code(u64::from(self) as _), 0);
     }
 }
 
 impl MouseButton {
-    pub fn bind<F>(self, callback: F)
-    where
-        F: Fn() + Send + Sync + 'static,
-    {
-        MOUSE_BINDS.lock().unwrap().insert(self, Arc::new(callback));
-    }
-
-    pub fn unbind(self) {
-        MOUSE_BINDS.lock().unwrap().remove(&self);
-    }
-
     pub fn is_pressed(self) -> bool {
         *BUTTON_STATES.lock().unwrap().entry(self).or_insert(false)
     }
@@ -89,7 +65,7 @@ pub fn handle_input_events() {
             grab_button(u32::from(*button), display, window);
         }
         for (key, _) in KEYBD_BINDS.lock().unwrap().iter() {
-            let key_code = u64::from(get_key_code(*key as u64));
+            let key_code = u64::from(get_key_code(u64::from(*key)));
             KEYCODES_TO_KEYBDKEYS.lock().unwrap().insert(key_code, *key);
             grab_key(key_code as i32, ShiftMask, display, window);
             grab_key(key_code as i32, 0, display, window);

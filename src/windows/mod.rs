@@ -3,11 +3,9 @@ extern crate winapi;
 
 use self::winapi::*;
 use self::user32::*;
-use ::*;
 use std::mem::{size_of, transmute, transmute_copy, uninitialized};
-use std::thread::spawn;
-use std::sync::atomic::{AtomicPtr, Ordering};
 use std::ptr::null_mut;
+use ::*;
 
 mod inputs;
 pub use self::inputs::*;
