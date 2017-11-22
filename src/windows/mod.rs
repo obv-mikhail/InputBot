@@ -60,8 +60,6 @@ fn set_hook(
         unsafe { SetWindowsHookExW(hook_id, Some(hook_proc), 0 as HINSTANCE, 0) },
         Ordering::Relaxed,
     );
-    let mut msg: MSG = unsafe { uninitialized() };
-    unsafe { GetMessageW(&mut msg, 0 as HWND, 0, 0) };
 }
 
 fn unset_hook(hook_ptr: &AtomicPtr<HHOOK__>) {
@@ -72,20 +70,6 @@ fn unset_hook(hook_ptr: &AtomicPtr<HHOOK__>) {
 }
 
 impl KeybdKey {
-    pub fn bind<F>(self, callback: F)
-    where
-        F: Fn() + Send + Sync + 'static,
-    {
-        KEYBD_BINDS.lock().unwrap().insert(self, Arc::new(callback));
-        if KEYBD_BINDS.lock().unwrap().len() == 1 {
-            spawn(move || set_hook(WH_KEYBOARD_LL, &*KEYBD_HHOOK, keybd_proc));
-        };
-    }
-
-    pub fn unbind(self) {
-        KEYBD_BINDS.lock().unwrap().remove(&self);
-    }
-
     pub fn is_pressed(self) -> bool {
         (unsafe { GetAsyncKeyState(self as i32) } >> 15) != 0
     }
@@ -100,20 +84,6 @@ impl KeybdKey {
 }
 
 impl MouseButton {
-    pub fn bind<F>(self, callback: F)
-    where
-        F: Fn() + Send + Sync + 'static,
-    {
-        MOUSE_BINDS.lock().unwrap().insert(self, Arc::new(callback));
-        if MOUSE_BINDS.lock().unwrap().len() == 1 {
-            spawn(move || set_hook(WH_MOUSE_LL, &*MOUSE_HHOOK, mouse_proc));
-        };
-    }
-
-    pub fn unbind(self) {
-        MOUSE_BINDS.lock().unwrap().remove(&self);
-    }
-
     pub fn is_pressed(self) -> bool {
         (unsafe { GetAsyncKeyState(u32::from(self) as i32) } >> 15) != 0
     }
@@ -135,6 +105,17 @@ impl MouseButton {
             _ => {}
         }
     }
+}
+
+pub fn handle_input_events() {
+    if !MOUSE_BINDS.lock().unwrap().is_empty() {
+        set_hook(WH_MOUSE_LL, &*MOUSE_HHOOK, mouse_proc);
+    };
+    if !KEYBD_BINDS.lock().unwrap().is_empty() {
+        set_hook(WH_KEYBOARD_LL, &*KEYBD_HHOOK, keybd_proc);
+    };
+    let mut msg: MSG = unsafe { uninitialized() };
+    unsafe { GetMessageW(&mut msg, 0 as HWND, 0, 0) };
 }
 
 fn send_mouse_input(flags: u32, data: u32, dx: i32, dy: i32) {
