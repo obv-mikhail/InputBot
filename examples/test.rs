@@ -4,7 +4,7 @@ use inputbot::*;
 use KeybdKey::*;
 use MouseButton::*;
 use std::time::Duration;
-use std::thread::{park, sleep};
+use std::thread::sleep;
 
 fn main() {
     // Autorun for videogames.
@@ -30,6 +30,5 @@ fn main() {
     // Mouse movement test
     QKey.bind(|| mouse_move(10, 10));
 
-    // Prevent main thread from exiting.
-    park();
+    handle_input_events();
 }
