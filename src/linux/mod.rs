@@ -8,10 +8,22 @@ use std::thread::spawn;
 use std::ptr::null;
 use ::*;
 
-pub mod inputs;
+mod inputs;
+pub use self::inputs::*;
 
 type ButtonStatesMap = Mutex<HashMap<MouseButton, bool>>;
 type KeyCodesMap = Mutex<HashMap<u64, KeybdKey>>;
+type InputBindMap = Mutex<HashMap<InputEvent, BindHandler>>;
+
+#[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
+enum InputEvent {
+    ButtonPress(MouseButton),
+    KeyPress(KeybdKey),
+}
+
+lazy_static! {
+    static ref INPUT_BINDS: InputBindMap = Mutex::new(HashMap::<InputEvent, BindHandler>::new());
+}
 
 lazy_static! {
     static ref KEYCODES_TO_KEYBDKEYS: KeyCodesMap = Mutex::new(HashMap::<u64, KeybdKey>::new());
