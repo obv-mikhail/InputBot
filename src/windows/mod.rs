@@ -47,8 +47,6 @@ unsafe extern "system" fn mouse_proc(code: c_int, w_param: WPARAM, l_param: LPAR
 }
 
 lazy_static! {
-    static ref KEYBD_BINDS: Mutex<HashMap<KeybdKey, BindHandler>> = Mutex::new(HashMap::<KeybdKey, BindHandler>::new());
-    static ref MOUSE_BINDS: Mutex<HashMap<MouseButton, BindHandler>> = Mutex::new(HashMap::<MouseButton, BindHandler>::new());
     static ref KEYBD_HHOOK: AtomicPtr<HHOOK__> = AtomicPtr::default();
     static ref MOUSE_HHOOK: AtomicPtr<HHOOK__> = AtomicPtr::default();
 }
