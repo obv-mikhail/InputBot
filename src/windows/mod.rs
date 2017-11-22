@@ -5,20 +5,16 @@ use self::winapi::*;
 use self::user32::*;
 use ::*;
 use std::mem::{size_of, transmute, transmute_copy, uninitialized};
-use std::cell::RefCell;
 use std::thread::spawn;
+use std::sync::atomic::{AtomicPtr, Ordering};
+use std::ptr::null_mut;
 
 pub mod inputs;
 
 unsafe extern "system" fn keybd_proc(code: c_int, w_param: WPARAM, l_param: LPARAM) -> LRESULT {
     if KEYBD_BINDS.lock().unwrap().is_empty() {
-        KEYBD_HHOOK.with(|hhook| {
-            if let Some(hhook) = *hhook.as_ptr() {
-                UnhookWindowsHookEx(hhook);
-            }
-        });
-    };
-    if let Some(event) = match w_param as u32 {
+        unset_hook(&*KEYBD_HHOOK);
+    } else if let Some(event) = match w_param as u32 {
         WM_KEYDOWN => Some(transmute(
             (*(l_param as *const KBDLLHOOKSTRUCT)).vkCode as u32,
         )),
@@ -27,20 +23,15 @@ unsafe extern "system" fn keybd_proc(code: c_int, w_param: WPARAM, l_param: LPAR
         if let Some(cb) = KEYBD_BINDS.lock().unwrap().get_mut(&event) {
             let cb = Arc::clone(cb);
             spawn(move || cb());
-        };
+        }
     }
-    CallNextHookEx(0 as _, code, w_param, l_param)
+    CallNextHookEx(null_mut(), code, w_param, l_param)
 }
 
 unsafe extern "system" fn mouse_proc(code: c_int, w_param: WPARAM, l_param: LPARAM) -> LRESULT {
     if MOUSE_BINDS.lock().unwrap().is_empty() {
-        MOUSE_HHOOK.with(|hhook| {
-            if let Some(hhook) = *hhook.as_ptr() {
-                UnhookWindowsHookEx(hhook);
-            }
-        });
-    };
-    if let Some(event) = match w_param as u32 {
+        unset_hook(&*MOUSE_HHOOK);
+    } else if let Some(event) = match w_param as u32 {
         WM_LBUTTONDOWN => Some(MouseButton::LeftButton),
         WM_RBUTTONDOWN => Some(MouseButton::RightButton),
         WM_MBUTTONDOWN => Some(MouseButton::MiddleButton),
@@ -51,17 +42,32 @@ unsafe extern "system" fn mouse_proc(code: c_int, w_param: WPARAM, l_param: LPAR
             spawn(move || cb());
         };
     }
-    CallNextHookEx(0 as _, code, w_param, l_param)
+    CallNextHookEx(null_mut(), code, w_param, l_param)
 }
 
 lazy_static! {
     static ref KEYBD_BINDS: Mutex<HashMap<KeybdKey, Arc<Fn() + Send + Sync + 'static>>> = Mutex::new(HashMap::<KeybdKey, Arc<Fn() + Send + Sync + 'static>>::new());
     static ref MOUSE_BINDS: Mutex<HashMap<MouseButton, Arc<Fn() + Send + Sync + 'static>>> = Mutex::new(HashMap::<MouseButton, Arc<Fn() + Send + Sync + 'static>>::new());
+    static ref KEYBD_HHOOK: AtomicPtr<HHOOK__> = AtomicPtr::default();
+    static ref MOUSE_HHOOK: AtomicPtr<HHOOK__> = AtomicPtr::default();
 }
 
-thread_local! {
-    static KEYBD_HHOOK: RefCell<Option<HHOOK>> = RefCell::new(None);
-    static MOUSE_HHOOK: RefCell<Option<HHOOK>> = RefCell::new(None);
+fn set_hook(hook_id: i32, hook_ptr: &AtomicPtr<HHOOK__>, hook_proc: unsafe extern "system" fn(i32, u64, i64) -> i64) {
+    hook_ptr.store(unsafe{SetWindowsHookExW(
+        hook_id,
+        Some(hook_proc),
+        0 as HINSTANCE,
+        0,
+    )}, Ordering::Relaxed);
+    let mut msg: MSG = unsafe{uninitialized()};
+    unsafe{GetMessageW(&mut msg, 0 as HWND, 0, 0)};
+}
+
+fn unset_hook(hook_ptr: &AtomicPtr<HHOOK__>) {
+    if !hook_ptr.load(Ordering::Relaxed).is_null() {
+        unsafe{ UnhookWindowsHookEx(hook_ptr.load(Ordering::Relaxed)) };
+        hook_ptr.store(null_mut(), Ordering::Relaxed);
+    }
 }
 
 impl KeybdKey {
@@ -70,19 +76,8 @@ impl KeybdKey {
         F: Fn() + Send + Sync + 'static,
     {
         KEYBD_BINDS.lock().unwrap().insert(self, Arc::new(callback));
-        if KEYBD_BINDS.lock().unwrap().len() == 1 {
-            spawn(move || unsafe {
-                KEYBD_HHOOK.with(|hhook| {
-                    *hhook.as_ptr() = Some(SetWindowsHookExW(
-                        WH_KEYBOARD_LL,
-                        Some(keybd_proc),
-                        0 as HINSTANCE,
-                        0,
-                    ))
-                });
-                let mut msg: MSG = uninitialized();
-                GetMessageW(&mut msg, 0 as HWND, 0, 0);
-            });
+        if KEYBD_BINDS.lock().unwrap().len() == 1  {
+            spawn(move || set_hook(WH_KEYBOARD_LL, &*KEYBD_HHOOK, keybd_proc));
         };
     }
 
@@ -110,18 +105,7 @@ impl MouseButton {
     {
         MOUSE_BINDS.lock().unwrap().insert(self, Arc::new(callback));
         if MOUSE_BINDS.lock().unwrap().len() == 1 {
-            spawn(move || unsafe {
-                MOUSE_HHOOK.with(|hhook| {
-                    *hhook.as_ptr() = Some(SetWindowsHookExW(
-                        WH_MOUSE_LL,
-                        Some(mouse_proc),
-                        0 as HINSTANCE,
-                        0,
-                    ))
-                });
-                let mut msg: MSG = uninitialized();
-                GetMessageW(&mut msg, 0 as HWND, 0, 0);
-            });
+            spawn(move || set_hook(WH_MOUSE_LL, &*MOUSE_HHOOK, mouse_proc));
         };
     }
 
