@@ -10,63 +10,18 @@ use ::*;
 mod inputs;
 pub use self::inputs::*;
 
-unsafe extern "system" fn keybd_proc(code: c_int, w_param: WPARAM, l_param: LPARAM) -> LRESULT {
-    if KEYBD_BINDS.lock().unwrap().is_empty() {
-        unset_hook(&*KEYBD_HHOOK);
-    } else if w_param as u32 == WM_KEYDOWN {
-        if let Some(cb) = KEYBD_BINDS.lock().unwrap().get_mut(&KeybdKey::from(
-            (*(l_param as *const KBDLLHOOKSTRUCT)).vkCode as u64,
-        )) {
-            let cb = Arc::clone(cb);
-            spawn(move || cb());
-        }
-    }
-    CallNextHookEx(null_mut(), code, w_param, l_param)
-}
-
-unsafe extern "system" fn mouse_proc(code: c_int, w_param: WPARAM, l_param: LPARAM) -> LRESULT {
-    if MOUSE_BINDS.lock().unwrap().is_empty() {
-        unset_hook(&*MOUSE_HHOOK);
-    } else if let Some(event) = match w_param as u32 {
-        WM_LBUTTONDOWN => Some(MouseButton::LeftButton),
-        WM_RBUTTONDOWN => Some(MouseButton::RightButton),
-        WM_MBUTTONDOWN => Some(MouseButton::MiddleButton),
-        _ => None,
-    } {
-        if let Some(cb) = MOUSE_BINDS.lock().unwrap().get_mut(&event) {
-            let cb = Arc::clone(cb);
-            spawn(move || cb());
-        };
-    }
-    CallNextHookEx(null_mut(), code, w_param, l_param)
-}
-
 lazy_static! {
     static ref KEYBD_HHOOK: AtomicPtr<HHOOK__> = AtomicPtr::default();
     static ref MOUSE_HHOOK: AtomicPtr<HHOOK__> = AtomicPtr::default();
 }
 
-fn set_hook(
-    hook_id: i32,
-    hook_ptr: &AtomicPtr<HHOOK__>,
-    hook_proc: unsafe extern "system" fn(i32, u64, i64) -> i64,
-) {
-    hook_ptr.store(
-        unsafe { SetWindowsHookExW(hook_id, Some(hook_proc), 0 as HINSTANCE, 0) },
-        Ordering::Relaxed,
-    );
-}
-
-fn unset_hook(hook_ptr: &AtomicPtr<HHOOK__>) {
-    if !hook_ptr.load(Ordering::Relaxed).is_null() {
-        unsafe { UnhookWindowsHookEx(hook_ptr.load(Ordering::Relaxed)) };
-        hook_ptr.store(null_mut(), Ordering::Relaxed);
-    }
-}
-
 impl KeybdKey {
     pub fn is_pressed(self) -> bool {
         (unsafe { GetAsyncKeyState(u64::from(self) as i32) } >> 15) != 0
+    }
+
+    pub fn is_toggled(self) -> bool {
+        unsafe { GetKeyState(u64::from(self) as i32) & 15 != 0 }
     }
 
     pub fn press(self) {
@@ -102,6 +57,33 @@ impl MouseButton {
     }
 }
 
+impl MouseCursor {
+    pub fn move_rel(self, dx: i32, dy: i32) {
+        send_mouse_input(MOUSEEVENTF_MOVE, 0, dx, dy);
+    }
+
+    pub fn move_abs(self, x: i32, y: i32) {
+        unsafe {
+            send_mouse_input(
+                MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE,
+                0,
+                x * 65_335 / GetSystemMetrics(78),
+                y * 65_335 / GetSystemMetrics(79),
+            )
+        };
+    }
+}
+
+impl MouseWheel {
+    pub fn scroll_ver(self, dwheel: i32) {
+        send_mouse_input(MOUSEEVENTF_WHEEL, unsafe { transmute(dwheel * 120) }, 0, 0);
+    }
+
+    pub fn scroll_hor(self, dwheel: i32) {
+        send_mouse_input(MOUSEEVENTF_HWHEEL, unsafe { transmute(dwheel * 120) }, 0, 0);
+    }
+}
+
 pub fn handle_input_events() {
     if !MOUSE_BINDS.lock().unwrap().is_empty() {
         set_hook(WH_MOUSE_LL, &*MOUSE_HHOOK, mouse_proc);
@@ -111,6 +93,55 @@ pub fn handle_input_events() {
     };
     let mut msg: MSG = unsafe { uninitialized() };
     unsafe { GetMessageW(&mut msg, 0 as HWND, 0, 0) };
+}
+
+unsafe extern "system" fn keybd_proc(code: c_int, w_param: WPARAM, l_param: LPARAM) -> LRESULT {
+    if KEYBD_BINDS.lock().unwrap().is_empty() {
+        unset_hook(&*KEYBD_HHOOK);
+    } else if w_param as u32 == WM_KEYDOWN {
+        if let Some(cb) = KEYBD_BINDS.lock().unwrap().get_mut(&KeybdKey::from(
+            (*(l_param as *const KBDLLHOOKSTRUCT)).vkCode as u64,
+        )) {
+            let cb = Arc::clone(cb);
+            spawn(move || cb());
+        }
+    }
+    CallNextHookEx(null_mut(), code, w_param, l_param)
+}
+
+unsafe extern "system" fn mouse_proc(code: c_int, w_param: WPARAM, l_param: LPARAM) -> LRESULT {
+    if MOUSE_BINDS.lock().unwrap().is_empty() {
+        unset_hook(&*MOUSE_HHOOK);
+    } else if let Some(event) = match w_param as u32 {
+        WM_LBUTTONDOWN => Some(MouseButton::LeftButton),
+        WM_RBUTTONDOWN => Some(MouseButton::RightButton),
+        WM_MBUTTONDOWN => Some(MouseButton::MiddleButton),
+        _ => None,
+    } {
+        if let Some(cb) = MOUSE_BINDS.lock().unwrap().get_mut(&event) {
+            let cb = Arc::clone(cb);
+            spawn(move || cb());
+        };
+    }
+    CallNextHookEx(null_mut(), code, w_param, l_param)
+}
+
+fn set_hook(
+    hook_id: i32,
+    hook_ptr: &AtomicPtr<HHOOK__>,
+    hook_proc: unsafe extern "system" fn(i32, u64, i64) -> i64,
+) {
+    hook_ptr.store(
+        unsafe { SetWindowsHookExW(hook_id, Some(hook_proc), 0 as HINSTANCE, 0) },
+        Ordering::Relaxed,
+    );
+}
+
+fn unset_hook(hook_ptr: &AtomicPtr<HHOOK__>) {
+    if !hook_ptr.load(Ordering::Relaxed).is_null() {
+        unsafe { UnhookWindowsHookEx(hook_ptr.load(Ordering::Relaxed)) };
+        hook_ptr.store(null_mut(), Ordering::Relaxed);
+    }
 }
 
 fn send_mouse_input(flags: u32, data: u32, dx: i32, dy: i32) {
@@ -144,35 +175,4 @@ fn send_keybd_input(flags: u32, key_code: KeybdKey) {
         },
     };
     unsafe { SendInput(1, &mut input as LPINPUT, size_of::<INPUT>() as c_int) };
-}
-
-pub fn mouse_move(dx: i32, dy: i32) {
-    send_mouse_input(MOUSEEVENTF_MOVE, 0, dx, dy);
-}
-
-pub fn mouse_move_to(x: i32, y: i32) {
-    unsafe {
-        send_mouse_input(
-            MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE,
-            0,
-            x * 65_335 / GetSystemMetrics(78),
-            y * 65_335 / GetSystemMetrics(79),
-        )
-    };
-}
-
-pub fn wheel_scroll_hor(dwheel: i32) {
-    send_mouse_input(MOUSEEVENTF_HWHEEL, unsafe { transmute(dwheel * 120) }, 0, 0);
-}
-
-pub fn wheel_scroll_ver(dwheel: i32) {
-    send_mouse_input(MOUSEEVENTF_WHEEL, unsafe { transmute(dwheel * 120) }, 0, 0);
-}
-
-pub fn num_lock_is_toggled() -> bool {
-    unsafe { GetKeyState(0x90 as i32) & 15 != 0 }
-}
-
-pub fn caps_lock_is_toggled() -> bool {
-    unsafe { GetKeyState(0x14 as i32) & 15 != 0 }
 }
