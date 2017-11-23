@@ -1,23 +1,23 @@
 [package]
 name = "inputbot"
-version = "0.3.0"
+version = "0.3.1"
 authors = ["obv-mikhail <obv.mikhail@gmail.com>"]
-description = "A library for creating global hotkeys, as well as emulating mouse and keyboard input."
-documentation = "https://obv-mikhail.github.io/doc/inputbot/"
+description = "A library for creating global hotkeys, and emulating inputs. Unlike AutoHotkey, InputBot handles hotkeys concurrently and supports both Windows and Linux."
+documentation = "https://docs.rs/inputbot"
 homepage = "https://github.com/obv-mikhail/inputbot"
 repository = "https://github.com/obv-mikhail/inputbot"
 readme = "README.md"
-keywords = ["hotkey", "mouse", "keyboard", "input"]
+keywords = ["hotkey", "mouse", "keyboard", "input", "bot", "cross-platform"]
 categories = ["api-bindings"]
 license = "MIT"
 
 [dependencies]
-lazy_static = "0.2"
+lazy_static = "0.2.11"
 
 [target.'cfg(windows)'.dependencies]
 winapi = "0.2.8"
 user32-sys = "0.2.0"
 
 [target.'cfg(target_os="linux")'.dependencies.x11]
-version = "2.14.0"
+version = "2.17.0"
 features = ["xlib", "xtest"]
