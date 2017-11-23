@@ -27,8 +27,9 @@ fn main() {
         }
     });
 
-    // Mouse movement test
+    // Mouse movement test.
     QKey.bind(|| MouseCursor.move_rel(10, 10));
 
+    // Call this to start listening for bound inputs.
     handle_input_events();
 }
