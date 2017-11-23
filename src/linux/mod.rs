@@ -42,6 +42,22 @@ impl KeybdKey {
     pub fn release(self) {
         send_keybd_input(get_key_code(u64::from(self) as _), 0);
     }
+
+    pub fn is_toggled(self) -> bool {
+        if let Some(_) = match self {
+            KeybdKey::NumLockKey => Some(2),
+            KeybdKey::CapsLockKey => Some(1),
+            _ => None,
+        } {
+            let mut state: XKeyboardState = unsafe { uninitialized() };
+            SEND_DISPLAY.with(|display| unsafe {
+                XGetKeyboardControl(display, &mut state);
+            });
+            (state.led_mask & 2 != 0)
+        } else {
+            false
+        }
+    }
 }
 
 impl MouseButton {
@@ -56,6 +72,26 @@ impl MouseButton {
     pub fn release(self) {
         send_mouse_input(u32::from(self), 0);
     }
+}
+
+impl MouseCursor {
+    pub fn move_rel(self, x: i32, y: i32) {
+        SEND_DISPLAY.with(|display| unsafe {
+            XWarpPointer(display, 0, 0, 0, 0, 0, 0, x, y);
+        });
+    }
+
+    pub fn move_abs(self, x: i32, y: i32) {
+        SEND_DISPLAY.with(|display| unsafe {
+            XWarpPointer(display, 0, 0, 0, 0, 0, 0, x, y);
+        });
+    }
+}
+
+impl MouseWheel {
+    pub fn scroll_ver(self, _: i32) {}
+
+    pub fn scroll_hor(self, _: i32) {}
 }
 
 pub fn handle_input_events() {
@@ -73,57 +109,6 @@ pub fn handle_input_events() {
     });
     while !MOUSE_BINDS.lock().unwrap().is_empty() || !KEYBD_BINDS.lock().unwrap().is_empty() {
         handle_input_event();
-    }
-}
-
-fn get_key_code(code: u64) -> u8 {
-    SEND_DISPLAY.with(|display| unsafe { XKeysymToKeycode(display, code) })
-}
-
-trait DisplayAcquirable {
-    fn with<F, Z>(&self, cb: F) -> Z
-    where
-        F: FnOnce(*mut Display) -> Z;
-}
-
-impl DisplayAcquirable for AtomicPtr<Display> {
-    fn with<F, Z>(&self, cb: F) -> Z
-    where
-        F: FnOnce(*mut Display) -> Z,
-    {
-        let display = self.load(Ordering::Relaxed);
-        unsafe {
-            XLockDisplay(display);
-        };
-        let cb_result = cb(display);
-        unsafe {
-            XFlush(display);
-            XUnlockDisplay(display);
-        };
-        cb_result
-    }
-}
-
-fn grab_button(button: u32, display: *mut Display, window: u64) {
-    unsafe {
-        XGrabButton(
-            display,
-            button,
-            AnyModifier,
-            window,
-            1,
-            (ButtonPressMask | ButtonReleaseMask) as u32,
-            GrabModeAsync,
-            GrabModeAsync,
-            0,
-            0,
-        );
-    }
-}
-
-fn grab_key(key: i32, mask: u32, display: *mut Display, window: u64) {
-    unsafe {
-        XGrabKey(display, key, mask, window, 0, GrabModeAsync, GrabModeAsync);
     }
 }
 
@@ -159,15 +144,36 @@ fn handle_input_event() {
     };
 }
 
-pub fn mouse_move_to(x: i32, y: i32) {
-    SEND_DISPLAY.with(|display| unsafe {
-        XWarpPointer(display, 0, 0, 0, 0, 0, 0, x, y);
-    });
+fn get_key_code(code: u64) -> u8 {
+    SEND_DISPLAY.with(|display| unsafe { XKeysymToKeycode(display, code) })
 }
 
-pub fn mouse_move(x: i32, y: i32) {
+fn grab_button(button: u32, display: *mut Display, window: u64) {
+    unsafe {
+        XGrabButton(
+            display,
+            button,
+            AnyModifier,
+            window,
+            1,
+            (ButtonPressMask | ButtonReleaseMask) as u32,
+            GrabModeAsync,
+            GrabModeAsync,
+            0,
+            0,
+        );
+    }
+}
+
+fn grab_key(key: i32, mask: u32, display: *mut Display, window: u64) {
+    unsafe {
+        XGrabKey(display, key, mask, window, 0, GrabModeAsync, GrabModeAsync);
+    }
+}
+
+fn send_keybd_input(code: u8, is_press: i32) {
     SEND_DISPLAY.with(|display| unsafe {
-        XWarpPointer(display, 0, 0, 0, 0, 0, 0, x, y);
+        XTestFakeKeyEvent(display, u32::from(code), is_press, 0);
     });
 }
 
@@ -177,24 +183,26 @@ fn send_mouse_input(button: u32, is_press: i32) {
     });
 }
 
-fn send_keybd_input(code: u8, is_press: i32) {
-    SEND_DISPLAY.with(|display| unsafe {
-        XTestFakeKeyEvent(display, u32::from(code), is_press, 0);
-    });
+trait DisplayAcquirable {
+    fn with<F, Z>(&self, cb: F) -> Z
+    where
+        F: FnOnce(*mut Display) -> Z;
 }
 
-pub fn num_lock_is_toggled() -> bool {
-    let mut state: XKeyboardState = unsafe { uninitialized() };
-    SEND_DISPLAY.with(|display| unsafe {
-        XGetKeyboardControl(display, &mut state);
-    });
-    (state.led_mask & 2 != 0)
-}
-
-pub fn caps_lock_is_toggled() -> bool {
-    let mut state: XKeyboardState = unsafe { uninitialized() };
-    SEND_DISPLAY.with(|display| unsafe {
-        XGetKeyboardControl(display, &mut state);
-    });
-    (state.led_mask & 1 != 0)
+impl DisplayAcquirable for AtomicPtr<Display> {
+    fn with<F, Z>(&self, cb: F) -> Z
+    where
+        F: FnOnce(*mut Display) -> Z,
+    {
+        let display = self.load(Ordering::Relaxed);
+        unsafe {
+            XLockDisplay(display);
+        };
+        let cb_result = cb(display);
+        unsafe {
+            XFlush(display);
+            XUnlockDisplay(display);
+        };
+        cb_result
+    }
 }

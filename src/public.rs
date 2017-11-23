@@ -79,7 +79,7 @@ pub enum KeybdKey {
     RShiftKey,
     LControlKey,
     RControlKey,
-    OtherKey(u64)
+    OtherKey(u64),
 }
 
 #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
@@ -91,6 +91,10 @@ pub enum MouseButton {
     X2Button,
     OtherButton(u32),
 }
+
+pub struct MouseCursor;
+
+pub struct MouseWheel;
 
 impl KeybdKey {
     pub fn bind<F: Fn() + Send + Sync + 'static>(self, callback: F) {

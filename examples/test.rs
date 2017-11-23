@@ -9,7 +9,7 @@ use std::thread::sleep;
 fn main() {
     // Autorun for videogames.
     NumLockKey.bind(|| {
-        while num_lock_is_toggled() {
+        while NumLockKey.is_toggled() {
             LShiftKey.press();
             WKey.press();
             sleep(Duration::from_millis(50));
@@ -28,7 +28,7 @@ fn main() {
     });
 
     // Mouse movement test
-    QKey.bind(|| mouse_move(10, 10));
+    QKey.bind(|| MouseCursor.move_rel(10, 10));
 
     handle_input_events();
 }

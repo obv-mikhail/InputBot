@@ -1,6 +1,6 @@
 use ::*;
-use ::KeybdKey::*;
-use ::MouseButton::*;
+use KeybdKey::*;
+use MouseButton::*;
 
 impl From<KeybdKey> for u64 {
     fn from(key: KeybdKey) -> u64 {
