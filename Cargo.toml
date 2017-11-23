@@ -7,7 +7,7 @@ documentation = "https://docs.rs/inputbot"
 homepage = "https://github.com/obv-mikhail/inputbot"
 repository = "https://github.com/obv-mikhail/inputbot"
 readme = "README.md"
-keywords = ["hotkey", "mouse", "keyboard", "input", "bot", "cross-platform"]
+keywords = ["hotkey", "mouse", "keyboard", "input", "bot"]
 categories = ["api-bindings"]
 license = "MIT"
 
