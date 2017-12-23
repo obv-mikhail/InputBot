@@ -155,7 +155,6 @@ pub struct KeySequence(pub &'static str);
 
 impl KeySequence {
     pub fn send(&self) {
-        sleep(Duration::from_millis(100));
         for c in self.0.chars() {
             let mut uppercase = false;
             if let Some(keybd_key) = {
@@ -166,15 +165,12 @@ impl KeySequence {
             } {
                 if uppercase {
                     KeybdKey::LShiftKey.press();
-                    sleep(Duration::from_millis(20));
                 }
                 keybd_key.press();
                 sleep(Duration::from_millis(20));
                 keybd_key.release();
-                sleep(Duration::from_millis(20));
                 if uppercase {
                     KeybdKey::LShiftKey.release();
-                    sleep(Duration::from_millis(20));
                 }
             };
         }

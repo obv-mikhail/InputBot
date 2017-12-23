@@ -103,8 +103,7 @@ pub fn handle_input_events() {
         for (key, _) in KEYBD_BINDS.lock().unwrap().iter() {
             let key_code = u64::from(get_key_code(u64::from(*key)));
             KEYCODES_TO_KEYBDKEYS.lock().unwrap().insert(key_code, *key);
-            grab_key(key_code as i32, ShiftMask, display, window);
-            grab_key(key_code as i32, 0, display, window);
+            grab_key(key_code as i32, AnyModifier, display, window);
         }
     });
     while !MOUSE_BINDS.lock().unwrap().is_empty() || !KEYBD_BINDS.lock().unwrap().is_empty() {
