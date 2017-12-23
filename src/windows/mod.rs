@@ -1,8 +1,9 @@
-extern crate user32;
 extern crate winapi;
 
-use self::winapi::*;
-use self::user32::*;
+use windows::winapi::um::winuser::*;
+use windows::winapi::shared::windef::*;
+use windows::winapi::shared::minwindef::*;
+use windows::winapi::ctypes::*;
 use std::mem::{size_of, transmute, transmute_copy, uninitialized};
 use std::ptr::null_mut;
 use ::*;
@@ -129,7 +130,7 @@ unsafe extern "system" fn mouse_proc(code: c_int, w_param: WPARAM, l_param: LPAR
 fn set_hook(
     hook_id: i32,
     hook_ptr: &AtomicPtr<HHOOK__>,
-    hook_proc: unsafe extern "system" fn(i32, u64, i64) -> i64,
+    hook_proc: unsafe extern "system" fn (c_int, WPARAM, LPARAM) -> LRESULT,
 ) {
     hook_ptr.store(
         unsafe { SetWindowsHookExW(hook_id, Some(hook_proc), 0 as HINSTANCE, 0) },
