@@ -35,7 +35,10 @@ fn main() {
         }
     });
 
-    // Mouse movement test.
+    // Send a key sequence.
+    RKey.bind(|| KeySequence("Sample text").send());
+
+    // Move mouse.
     QKey.bind(|| MouseCursor.move_rel(10, 10));
 
     // Call this to start listening for bound inputs.
