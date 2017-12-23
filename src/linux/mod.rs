@@ -44,7 +44,7 @@ impl KeybdKey {
     }
 
     pub fn is_toggled(self) -> bool {
-        if let Some(_) = match self {
+        if let Some(key) = match self {
             KeybdKey::NumLockKey => Some(2),
             KeybdKey::CapsLockKey => Some(1),
             _ => None,
@@ -53,7 +53,7 @@ impl KeybdKey {
             SEND_DISPLAY.with(|display| unsafe {
                 XGetKeyboardControl(display, &mut state);
             });
-            (state.led_mask & 2 != 0)
+            (state.led_mask & key != 0)
         } else {
             false
         }
@@ -121,7 +121,7 @@ fn handle_input_event() {
             .unwrap()
             .get_mut(&u64::from((ev.as_ref() as &XKeyEvent).keycode))
         {
-            if let Some(cb) = KEYBD_BINDS.lock().unwrap().get_mut(keybd_key) {
+            if let Some(cb) = KEYBD_BINDS.lock().unwrap().get(keybd_key) {
                 let cb = Arc::clone(cb);
                 spawn(move || cb());
             };
@@ -129,7 +129,7 @@ fn handle_input_event() {
         4 => {
             let mouse_button = MouseButton::from((ev.as_ref() as &XKeyEvent).keycode);
             BUTTON_STATES.lock().unwrap().insert(mouse_button, true);
-            if let Some(cb) = MOUSE_BINDS.lock().unwrap().get_mut(&mouse_button) {
+            if let Some(cb) = MOUSE_BINDS.lock().unwrap().get(&mouse_button) {
                 let cb = Arc::clone(cb);
                 spawn(move || cb());
             };

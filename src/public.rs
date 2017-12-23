@@ -1,3 +1,5 @@
+use std::time::Duration;
+use std::thread::sleep;
 use ::*;
 
 #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
@@ -113,5 +115,68 @@ impl MouseButton {
 
     pub fn unbind(self) {
         MOUSE_BINDS.lock().unwrap().remove(&self);
+    }
+}
+
+fn get_keybd_key(c: char) -> Option<KeybdKey> {
+    match c {
+        ' ' => Some(KeybdKey::SpaceKey),
+        'A' | 'a' => Some(KeybdKey::AKey),
+        'B' | 'b' => Some(KeybdKey::BKey),
+        'C' | 'c' => Some(KeybdKey::CKey),
+        'D' | 'd' => Some(KeybdKey::DKey),
+        'E' | 'e' => Some(KeybdKey::EKey),
+        'F' | 'f' => Some(KeybdKey::FKey),
+        'G' | 'g' => Some(KeybdKey::GKey),
+        'H' | 'h' => Some(KeybdKey::HKey),
+        'I' | 'i' => Some(KeybdKey::IKey),
+        'J' | 'j' => Some(KeybdKey::JKey),
+        'K' | 'k' => Some(KeybdKey::KKey),
+        'L' | 'l' => Some(KeybdKey::LKey),
+        'M' | 'm' => Some(KeybdKey::MKey),
+        'N' | 'n' => Some(KeybdKey::NKey),
+        'O' | 'o' => Some(KeybdKey::OKey),
+        'P' | 'p' => Some(KeybdKey::PKey),
+        'Q' | 'q' => Some(KeybdKey::QKey),
+        'R' | 'r' => Some(KeybdKey::RKey),
+        'S' | 's' => Some(KeybdKey::SKey),
+        'T' | 't' => Some(KeybdKey::TKey),
+        'U' | 'u' => Some(KeybdKey::UKey),
+        'V' | 'v' => Some(KeybdKey::VKey),
+        'W' | 'w' => Some(KeybdKey::WKey),
+        'X' | 'x' => Some(KeybdKey::XKey),
+        'Y' | 'y' => Some(KeybdKey::YKey),
+        'Z' | 'z' => Some(KeybdKey::ZKey),
+        _ => None,
+    }
+}
+
+pub struct KeySequence(pub &'static str);
+
+impl KeySequence {
+    pub fn send(&self) {
+        sleep(Duration::from_millis(100));
+        for c in self.0.chars() {
+            let mut uppercase = false;
+            if let Some(keybd_key) = {
+                if c.is_uppercase() {
+                    uppercase = true;
+                }
+                get_keybd_key(c)
+            } {
+                if uppercase {
+                    KeybdKey::LShiftKey.press();
+                    sleep(Duration::from_millis(20));
+                }
+                keybd_key.press();
+                sleep(Duration::from_millis(20));
+                keybd_key.release();
+                sleep(Duration::from_millis(20));
+                if uppercase {
+                    KeybdKey::LShiftKey.release();
+                    sleep(Duration::from_millis(20));
+                }
+            };
+        }
     }
 }
