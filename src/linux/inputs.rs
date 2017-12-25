@@ -112,3 +112,19 @@ impl From<MouseButton> for u32 {
         }
     }
 }
+
+pub fn scan_code_to_key(scan_code: u32) -> Option<KeybdKey> {
+    match scan_code {
+        16 => Some(QKey),
+        17 => Some(WKey),
+        18 => Some(EKey),
+        19 => Some(RKey),
+        20 => Some(TKey),
+        21 => Some(YKey),
+        22 => Some(UKey),
+        23 => Some(IKey),
+        24 => Some(OKey),
+        25 => Some(PKey),
+        _ => None,
+    }
+}

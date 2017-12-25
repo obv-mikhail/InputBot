@@ -1,4 +1,27 @@
 extern crate x11;
+extern crate input;
+extern crate libc;
+extern crate udev;
+extern crate nix;
+
+use linux::nix::fcntl::{open, OFlag};
+use linux::nix::sys::stat::{Mode};
+use linux::nix::unistd::{close};
+
+use linux::input::Libinput;
+use linux::input::LibinputInterface;
+use linux::input::event::Event;
+use linux::input::event::Event::*;
+use linux::input::event::pointer::ButtonState;
+use linux::input::event::keyboard::KeyState;
+use linux::input::event::keyboard::{KeyboardEvent, KeyboardEventTrait};
+use linux::input::event::pointer::PointerEvent::*;
+
+use std::os::unix::io::RawFd;
+use std::path::Path;
+
+use std::time::Duration;
+use std::thread::sleep;
 
 use self::x11::xlib::*;
 use self::x11::xtest::*;
@@ -6,20 +29,16 @@ use std::mem::uninitialized;
 use std::ptr::null;
 use ::*;
 
+use linux::inputs::scan_code_to_key;
+
 mod inputs;
 pub use self::inputs::*;
 
-type KeyCodesMap = HashMap<u64, KeybdKey>;
 type ButtonStatesMap = HashMap<MouseButton, bool>;
 
 lazy_static! {
-    static ref KEYCODES_TO_KEYBDKEYS: Mutex<KeyCodesMap> = Mutex::new(KeyCodesMap::new());
     static ref BUTTON_STATES: Mutex<ButtonStatesMap> = Mutex::new(ButtonStatesMap::new());
     static ref SEND_DISPLAY: AtomicPtr<Display> = {
-        unsafe { XInitThreads() };
-        AtomicPtr::new(unsafe { XOpenDisplay(null()) })
-    };
-    static ref RECV_DISPLAY: AtomicPtr<Display> = {
         unsafe { XInitThreads() };
         AtomicPtr::new(unsafe { XOpenDisplay(null()) })
     };
@@ -94,80 +113,84 @@ impl MouseWheel {
     pub fn scroll_hor(self, _: i32) {}
 }
 
-pub fn handle_input_events() {
-    RECV_DISPLAY.with(|display| {
-        let window = unsafe { XDefaultRootWindow(display) };
-        for (button, _) in MOUSE_BINDS.lock().unwrap().iter() {
-            grab_button(u32::from(*button), display, window);
-        }
-        for (key, _) in KEYBD_BINDS.lock().unwrap().iter() {
-            let key_code = u64::from(get_key_code(u64::from(*key)));
-            KEYCODES_TO_KEYBDKEYS.lock().unwrap().insert(key_code, *key);
-            grab_key(key_code as i32, AnyModifier, display, window);
-        }
-    });
-    while !MOUSE_BINDS.lock().unwrap().is_empty() || !KEYBD_BINDS.lock().unwrap().is_empty() {
-        handle_input_event();
+struct LibinputInterfaceRaw;
+
+impl LibinputInterfaceRaw {
+    fn seat(&self) -> String {
+        String::from("seat0")
     }
 }
 
-fn handle_input_event() {
-    let mut ev = unsafe { uninitialized() };
-    RECV_DISPLAY.with(|display| unsafe { XNextEvent(display, &mut ev) });
-    match ev.get_type() {
-        2 => if let Some(keybd_key) = KEYCODES_TO_KEYBDKEYS
-            .lock()
-            .unwrap()
-            .get_mut(&u64::from((ev.as_ref() as &XKeyEvent).keycode))
-        {
-            if let Some(cb) = KEYBD_BINDS.lock().unwrap().get(keybd_key) {
-                let cb = Arc::clone(cb);
-                spawn(move || cb());
-            };
+impl LibinputInterface for LibinputInterfaceRaw {
+    fn open_restricted(&mut self, path: &Path, flags: i32) -> std::result::Result<RawFd, i32> {
+        if let Ok(fd) = open(path, OFlag::from_bits_truncate(flags), Mode::empty()) {
+            Ok(fd)
+        } else {
+            Err(1)
+        }
+    }
+
+    fn close_restricted(&mut self, fd: RawFd) {
+        let _ = close(fd);
+    }
+}
+
+pub fn handle_input_events() {
+    let udev_context = udev::Context::new().unwrap();
+    let mut libinput_context = Libinput::new_from_udev(LibinputInterfaceRaw, &udev_context);
+    libinput_context.udev_assign_seat(&LibinputInterfaceRaw.seat()).unwrap();
+    while !MOUSE_BINDS.lock().unwrap().is_empty() || !KEYBD_BINDS.lock().unwrap().is_empty() {
+        libinput_context.dispatch().unwrap();
+        while let Some(event) = libinput_context.next() {
+            handle_input_event(event);
+        }
+        sleep(Duration::from_millis(10));
+    }
+}
+
+fn handle_input_event(event: Event) {
+    match event {
+        Keyboard(keyboard_event) => {
+            let KeyboardEvent::Key(keyboard_key_event) = keyboard_event;
+            let key = keyboard_key_event.key();
+            if let Some(keybd_key) = scan_code_to_key(key) {
+                if keyboard_key_event.key_state() == KeyState::Pressed {
+                    if let Some(cb) = KEYBD_BINDS.lock().unwrap().get(&keybd_key) {
+                        let cb = Arc::clone(cb);
+                        spawn(move || cb());
+                    };
+                }
+            }
         },
-        4 => {
-            let mouse_button = MouseButton::from((ev.as_ref() as &XKeyEvent).keycode);
-            BUTTON_STATES.lock().unwrap().insert(mouse_button, true);
-            if let Some(cb) = MOUSE_BINDS.lock().unwrap().get(&mouse_button) {
-                let cb = Arc::clone(cb);
-                spawn(move || cb());
-            };
-        }
-        5 => {
-            BUTTON_STATES.lock().unwrap().insert(
-                MouseButton::from((ev.as_ref() as &XKeyEvent).keycode),
-                false,
-            );
-        }
+        Pointer(pointer_event) => {
+            if let Button(button_event) = pointer_event {
+                let button = button_event.button();
+                if let Some(mouse_button) = match button {
+                    272 => Some(MouseButton::LeftButton),
+                    273 => Some(MouseButton::RightButton),
+                    274 => Some(MouseButton::MiddleButton),
+                    275 => Some(MouseButton::X1Button),
+                    276 => Some(MouseButton::X2Button),
+                    _ => None,
+                } {
+                    if button_event.button_state() == ButtonState::Pressed {
+                        BUTTON_STATES.lock().unwrap().insert(mouse_button, true);
+                        if let Some(cb) = MOUSE_BINDS.lock().unwrap().get(&mouse_button) {
+                            let cb = Arc::clone(cb);
+                            spawn(move || cb());
+                        };
+                    } else {
+                        BUTTON_STATES.lock().unwrap().insert(mouse_button, false);
+                    }
+                }
+            }
+        },
         _ => {}
-    };
+    }
 }
 
 fn get_key_code(code: u64) -> u8 {
     SEND_DISPLAY.with(|display| unsafe { XKeysymToKeycode(display, code) })
-}
-
-fn grab_button(button: u32, display: *mut Display, window: u64) {
-    unsafe {
-        XGrabButton(
-            display,
-            button,
-            AnyModifier,
-            window,
-            1,
-            (ButtonPressMask | ButtonReleaseMask) as u32,
-            GrabModeAsync,
-            GrabModeAsync,
-            0,
-            0,
-        );
-    }
-}
-
-fn grab_key(key: i32, mask: u32, display: *mut Display, window: u64) {
-    unsafe {
-        XGrabKey(display, key, mask, window, 0, GrabModeAsync, GrabModeAsync);
-    }
 }
 
 fn send_keybd_input(code: u8, is_press: i32) {
