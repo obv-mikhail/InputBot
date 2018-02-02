@@ -3,6 +3,10 @@ extern crate input;
 extern crate libc;
 extern crate udev;
 extern crate nix;
+extern crate uinput;
+
+use linux::uinput::event::keyboard;
+use linux::uinput::event::relative::Position;
 
 use linux::nix::fcntl::{open, OFlag};
 use linux::nix::sys::stat::{Mode};
@@ -42,6 +46,14 @@ lazy_static! {
         unsafe { XInitThreads() };
         AtomicPtr::new(unsafe { XOpenDisplay(null()) })
     };
+    static ref KEYBD_DEVICE: Mutex<uinput::Device> = {
+        Mutex::new(uinput::default().unwrap()
+		.name("test").unwrap()
+		.event(uinput::event::Keyboard::All).unwrap()
+        .event(Position::X).unwrap()
+        .event(Position::Y).unwrap()
+		.create().unwrap())
+    };
 }
 
 impl KeybdKey {
@@ -55,11 +67,11 @@ impl KeybdKey {
     }
 
     pub fn press(self) {
-        send_keybd_input(get_key_code(u64::from(self) as _), 1);
+        KEYBD_DEVICE.lock().unwrap().write(0x01, key_to_scan_code(self), 1).unwrap();
     }
 
     pub fn release(self) {
-        send_keybd_input(get_key_code(u64::from(self) as _), 0);
+        KEYBD_DEVICE.lock().unwrap().write(0x01, key_to_scan_code(self), 0).unwrap();
     }
 
     pub fn is_toggled(self) -> bool {
@@ -85,6 +97,8 @@ impl MouseButton {
     }
 
     pub fn press(self) {
+
+        //KEYBD_DEVICE.lock().unwrap().write(0x01, key_to_scan_code(self), 1).unwrap();
         send_mouse_input(u32::from(self), 1);
     }
 
@@ -95,12 +109,17 @@ impl MouseButton {
 
 impl MouseCursor {
     pub fn move_rel(self, x: i32, y: i32) {
-        SEND_DISPLAY.with(|display| unsafe {
-            XWarpPointer(display, 0, 0, 0, 0, 0, 0, x, y);
-        });
+        KEYBD_DEVICE.lock().unwrap().position(&Position::X, x).unwrap();
+        KEYBD_DEVICE.lock().unwrap().position(&Position::Y, y).unwrap();
+        KEYBD_DEVICE.lock().unwrap().synchronize().unwrap();
+        //SEND_DISPLAY.with(|display| unsafe {
+        //    XWarpPointer(display, 0, 0, 0, 0, 0, 0, x, y);
+        //});
     }
 
     pub fn move_abs(self, x: i32, y: i32) {
+        //KEYBD_DEVICE.lock().unwrap().position(&Position::X, x).unwrap();
+        //KEYBD_DEVICE.lock().unwrap().position(&Position::Y, y).unwrap();
         SEND_DISPLAY.with(|display| unsafe {
             XWarpPointer(display, 0, 0, 0, 0, 0, 0, x, y);
         });
@@ -191,12 +210,6 @@ fn handle_input_event(event: Event) {
 
 fn get_key_code(code: u64) -> u8 {
     SEND_DISPLAY.with(|display| unsafe { XKeysymToKeycode(display, code) })
-}
-
-fn send_keybd_input(code: u8, is_press: i32) {
-    SEND_DISPLAY.with(|display| unsafe {
-        XTestFakeKeyEvent(display, u32::from(code), is_press, 0);
-    });
 }
 
 fn send_mouse_input(button: u32, is_press: i32) {
