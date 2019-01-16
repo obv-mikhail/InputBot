@@ -1,37 +1,37 @@
-extern crate x11;
 extern crate input;
 extern crate libc;
-extern crate udev;
 extern crate nix;
+extern crate udev;
 extern crate uinput;
+extern crate x11;
 
 use linux::uinput::event::keyboard;
 use linux::uinput::event::relative::Position;
 
 use linux::nix::fcntl::{open, OFlag};
-use linux::nix::sys::stat::{Mode};
-use linux::nix::unistd::{close};
+use linux::nix::sys::stat::Mode;
+use linux::nix::unistd::close;
 
-use linux::input::Libinput;
-use linux::input::LibinputInterface;
-use linux::input::event::Event;
-use linux::input::event::Event::*;
-use linux::input::event::pointer::ButtonState;
 use linux::input::event::keyboard::KeyState;
 use linux::input::event::keyboard::{KeyboardEvent, KeyboardEventTrait};
+use linux::input::event::pointer::ButtonState;
 use linux::input::event::pointer::PointerEvent::*;
+use linux::input::event::Event;
+use linux::input::event::Event::*;
+use linux::input::Libinput;
+use linux::input::LibinputInterface;
 
 use std::os::unix::io::RawFd;
 use std::path::Path;
 
-use std::time::Duration;
 use std::thread::sleep;
+use std::time::Duration;
 
 use self::x11::xlib::*;
 use self::x11::xtest::*;
 use std::mem::uninitialized;
 use std::ptr::null;
-use ::*;
+use *;
 
 use linux::inputs::scan_code_to_key;
 
@@ -47,12 +47,20 @@ lazy_static! {
         AtomicPtr::new(unsafe { XOpenDisplay(null()) })
     };
     static ref KEYBD_DEVICE: Mutex<uinput::Device> = {
-        Mutex::new(uinput::default().unwrap()
-		.name("test").unwrap()
-		.event(uinput::event::Keyboard::All).unwrap()
-        .event(Position::X).unwrap()
-        .event(Position::Y).unwrap()
-		.create().unwrap())
+        Mutex::new(
+            uinput::default()
+                .unwrap()
+                .name("test")
+                .unwrap()
+                .event(uinput::event::Keyboard::All)
+                .unwrap()
+                .event(Position::X)
+                .unwrap()
+                .event(Position::Y)
+                .unwrap()
+                .create()
+                .unwrap(),
+        )
     };
 }
 
@@ -67,11 +75,19 @@ impl KeybdKey {
     }
 
     pub fn press(self) {
-        KEYBD_DEVICE.lock().unwrap().write(0x01, key_to_scan_code(self), 1).unwrap();
+        KEYBD_DEVICE
+            .lock()
+            .unwrap()
+            .write(0x01, key_to_scan_code(self), 1)
+            .unwrap();
     }
 
     pub fn release(self) {
-        KEYBD_DEVICE.lock().unwrap().write(0x01, key_to_scan_code(self), 0).unwrap();
+        KEYBD_DEVICE
+            .lock()
+            .unwrap()
+            .write(0x01, key_to_scan_code(self), 0)
+            .unwrap();
     }
 
     pub fn is_toggled(self) -> bool {
@@ -97,7 +113,6 @@ impl MouseButton {
     }
 
     pub fn press(self) {
-
         //KEYBD_DEVICE.lock().unwrap().write(0x01, key_to_scan_code(self), 1).unwrap();
         send_mouse_input(u32::from(self), 1);
     }
@@ -109,8 +124,16 @@ impl MouseButton {
 
 impl MouseCursor {
     pub fn move_rel(self, x: i32, y: i32) {
-        KEYBD_DEVICE.lock().unwrap().position(&Position::X, x).unwrap();
-        KEYBD_DEVICE.lock().unwrap().position(&Position::Y, y).unwrap();
+        KEYBD_DEVICE
+            .lock()
+            .unwrap()
+            .position(&Position::X, x)
+            .unwrap();
+        KEYBD_DEVICE
+            .lock()
+            .unwrap()
+            .position(&Position::Y, y)
+            .unwrap();
         KEYBD_DEVICE.lock().unwrap().synchronize().unwrap();
         //SEND_DISPLAY.with(|display| unsafe {
         //    XWarpPointer(display, 0, 0, 0, 0, 0, 0, x, y);
@@ -157,7 +180,9 @@ impl LibinputInterface for LibinputInterfaceRaw {
 pub fn handle_input_events() {
     let udev_context = udev::Context::new().unwrap();
     let mut libinput_context = Libinput::new_from_udev(LibinputInterfaceRaw, &udev_context);
-    libinput_context.udev_assign_seat(&LibinputInterfaceRaw.seat()).unwrap();
+    libinput_context
+        .udev_assign_seat(&LibinputInterfaceRaw.seat())
+        .unwrap();
     while !MOUSE_BINDS.lock().unwrap().is_empty() || !KEYBD_BINDS.lock().unwrap().is_empty() {
         libinput_context.dispatch().unwrap();
         while let Some(event) = libinput_context.next() {
@@ -180,7 +205,7 @@ fn handle_input_event(event: Event) {
                     };
                 }
             }
-        },
+        }
         Pointer(pointer_event) => {
             if let Button(button_event) = pointer_event {
                 let button = button_event.button();
@@ -203,7 +228,7 @@ fn handle_input_event(event: Event) {
                     }
                 }
             }
-        },
+        }
         _ => {}
     }
 }

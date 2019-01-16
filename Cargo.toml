@@ -10,12 +10,13 @@ readme = "README.md"
 keywords = ["hotkey", "mouse", "keyboard", "input", "bot"]
 categories = ["api-bindings"]
 license = "MIT"
+edition = "2018"
 
 [dependencies]
-lazy_static = "0.2.11"
+lazy_static = "1.2.0"
 
 [target.'cfg(windows)'.dependencies]
-winapi = { version = "0.3", features = ["winuser"] }
+winapi = { version = "0.3.6", features = ["winuser"] }
 
 [target.'cfg(target_os="linux")'.dependencies]
 libc = "0.2.34"

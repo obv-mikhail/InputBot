@@ -6,13 +6,8 @@ Unlike AutoHotkey, InputBot handles hotkeys concurrently and supports both Windo
 The code below demonstrates how to create some simple hotkeys.
 
 ```Rust
-extern crate inputbot;
-
-use inputbot::*;
-use KeybdKey::*;
-use MouseButton::*;
-use std::time::Duration;
-use std::thread::sleep;
+use inputbot::{KeybdKey::*, MouseButton::*, *};
+use std::{thread::sleep, time::Duration};
 
 fn main() {
     // Autorun for videogames.

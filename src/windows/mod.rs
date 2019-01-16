@@ -1,15 +1,16 @@
-extern crate winapi;
-
-use windows::winapi::um::winuser::*;
-use windows::winapi::shared::windef::*;
-use windows::winapi::shared::minwindef::*;
-use windows::winapi::ctypes::*;
-use std::mem::{size_of, transmute, transmute_copy, uninitialized};
-use std::ptr::null_mut;
-use ::*;
+use crate::{common::*, public::*};
+use std::{
+    mem::{size_of, transmute, transmute_copy, uninitialized},
+    ptr::null_mut,
+    sync::atomic::AtomicPtr,
+};
+use winapi::{
+    ctypes::*,
+    shared::{minwindef::*, windef::*},
+    um::winuser::*,
+};
 
 mod inputs;
-pub use self::inputs::*;
 
 lazy_static! {
     static ref KEYBD_HHOOK: AtomicPtr<HHOOK__> = AtomicPtr::default();
@@ -100,9 +101,13 @@ unsafe extern "system" fn keybd_proc(code: c_int, w_param: WPARAM, l_param: LPAR
     if KEYBD_BINDS.lock().unwrap().is_empty() {
         unset_hook(&*KEYBD_HHOOK);
     } else if w_param as u32 == WM_KEYDOWN {
-        if let Some(cb) = KEYBD_BINDS.lock().unwrap().get_mut(&KeybdKey::from(
-            (*(l_param as *const KBDLLHOOKSTRUCT)).vkCode as u64,
-        )) {
+        if let Some(cb) = KEYBD_BINDS
+            .lock()
+            .unwrap()
+            .get_mut(&KeybdKey::from(u64::from(
+                (*(l_param as *const KBDLLHOOKSTRUCT)).vkCode,
+            )))
+        {
             let cb = Arc::clone(cb);
             spawn(move || cb());
         }
@@ -130,7 +135,7 @@ unsafe extern "system" fn mouse_proc(code: c_int, w_param: WPARAM, l_param: LPAR
 fn set_hook(
     hook_id: i32,
     hook_ptr: &AtomicPtr<HHOOK__>,
-    hook_proc: unsafe extern "system" fn (c_int, WPARAM, LPARAM) -> LRESULT,
+    hook_proc: unsafe extern "system" fn(c_int, WPARAM, LPARAM) -> LRESULT,
 ) {
     hook_ptr.store(
         unsafe { SetWindowsHookExW(hook_id, Some(hook_proc), 0 as HINSTANCE, 0) },
@@ -150,8 +155,8 @@ fn send_mouse_input(flags: u32, data: u32, dx: i32, dy: i32) {
         type_: INPUT_MOUSE,
         u: unsafe {
             transmute_copy(&MOUSEINPUT {
-                dx: dx,
-                dy: dy,
+                dx,
+                dy,
                 mouseData: data,
                 dwFlags: flags,
                 time: 0,

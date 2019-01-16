@@ -1,6 +1,5 @@
-use std::time::Duration;
-use std::thread::sleep;
-use ::*;
+use crate::common::*;
+use std::{thread::sleep, time::Duration};
 
 #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
 pub enum KeybdKey {

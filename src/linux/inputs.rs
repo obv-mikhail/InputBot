@@ -1,6 +1,6 @@
-use ::*;
 use KeybdKey::*;
 use MouseButton::*;
+use *;
 
 impl From<KeybdKey> for u64 {
     fn from(key: KeybdKey) -> u64 {
@@ -124,7 +124,6 @@ impl From<MouseButton> for u32 {
         }
     }
 }
-
 
 // https://www.win.tue.nl/~aeb/linux/kbd/scancodes-1.html
 pub fn scan_code_to_key(scan_code: u32) -> Option<KeybdKey> {
