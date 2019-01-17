@@ -1,42 +1,26 @@
-extern crate input;
-extern crate libc;
-extern crate nix;
-extern crate udev;
-extern crate uinput;
-extern crate x11;
-
-use linux::uinput::event::keyboard;
-use linux::uinput::event::relative::Position;
-
-use linux::nix::fcntl::{open, OFlag};
-use linux::nix::sys::stat::Mode;
-use linux::nix::unistd::close;
-
-use linux::input::event::keyboard::KeyState;
-use linux::input::event::keyboard::{KeyboardEvent, KeyboardEventTrait};
-use linux::input::event::pointer::ButtonState;
-use linux::input::event::pointer::PointerEvent::*;
-use linux::input::event::Event;
-use linux::input::event::Event::*;
-use linux::input::Libinput;
-use linux::input::LibinputInterface;
-
-use std::os::unix::io::RawFd;
-use std::path::Path;
-
-use std::thread::sleep;
-use std::time::Duration;
-
-use self::x11::xlib::*;
-use self::x11::xtest::*;
-use std::mem::uninitialized;
-use std::ptr::null;
-use *;
-
-use linux::inputs::scan_code_to_key;
+use crate::{common::*, linux::inputs::*, public::*};
+use input::{
+    event::{
+        keyboard::{
+            KeyState, {KeyboardEvent, KeyboardEventTrait},
+        },
+        pointer::{ButtonState, PointerEvent::*},
+        Event::{self, *},
+    },
+    Libinput, LibinputInterface,
+};
+use nix::{
+    fcntl::{open, OFlag},
+    sys::stat::Mode,
+    unistd::close,
+};
+use std::{
+    mem::uninitialized, os::unix::io::RawFd, path::Path, ptr::null, thread::sleep, time::Duration,
+};
+use uinput::event::relative::Position;
+use x11::{xlib::*, xtest::*};
 
 mod inputs;
-pub use self::inputs::*;
 
 type ButtonStatesMap = HashMap<MouseButton, bool>;
 

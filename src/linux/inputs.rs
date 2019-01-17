@@ -1,6 +1,7 @@
-use KeybdKey::*;
-use MouseButton::*;
-use *;
+use crate::public::{
+    KeybdKey::{self, *},
+    MouseButton::{self, *},
+};
 
 impl From<KeybdKey> for u64 {
     fn from(key: KeybdKey) -> u64 {
