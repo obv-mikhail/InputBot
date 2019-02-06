@@ -1,6 +1,12 @@
 use crate::common::*;
 use std::{thread::sleep, time::Duration};
 
+// TODO: Come up with a better name
+pub enum BlockInput {
+    Block,
+    DontBlock,
+}
+
 #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
 pub enum KeybdKey {
     BackspaceKey,
@@ -111,7 +117,17 @@ pub struct MouseWheel;
 
 impl KeybdKey {
     pub fn bind<F: Fn() + Send + Sync + 'static>(self, callback: F) {
-        KEYBD_BINDS.lock().unwrap().insert(self, Arc::new(callback));
+        KEYBD_BINDS
+            .lock()
+            .unwrap()
+            .insert(self, Bind::NormalBind(Arc::new(callback)));
+    }
+
+    pub fn blockable_bind<F: Fn() -> BlockInput + Send + Sync + 'static>(self, callback: F) {
+        KEYBD_BINDS
+            .lock()
+            .unwrap()
+            .insert(self, Bind::BlockableBind(Arc::new(callback)));
     }
 
     pub fn unbind(self) {
@@ -121,7 +137,17 @@ impl KeybdKey {
 
 impl MouseButton {
     pub fn bind<F: Fn() + Send + Sync + 'static>(self, callback: F) {
-        MOUSE_BINDS.lock().unwrap().insert(self, Arc::new(callback));
+        MOUSE_BINDS
+            .lock()
+            .unwrap()
+            .insert(self, Bind::NormalBind(Arc::new(callback)));
+    }
+
+    pub fn blockable_bind<F: Fn() -> BlockInput + Send + Sync + 'static>(self, callback: F) {
+        MOUSE_BINDS
+            .lock()
+            .unwrap()
+            .insert(self, Bind::BlockableBind(Arc::new(callback)));
     }
 
     pub fn unbind(self) {
