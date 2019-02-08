@@ -6,9 +6,15 @@ pub use std::{
     thread::spawn,
 };
 
+pub enum Bind {
+    NormalBind(BindHandler),
+    BlockableBind(BlockableBindHandler),
+}
+
 pub type BindHandler = Arc<Fn() + Send + Sync + 'static>;
-pub type KeybdBindMap = HashMap<KeybdKey, BindHandler>;
-pub type MouseBindMap = HashMap<MouseButton, BindHandler>;
+pub type BlockableBindHandler = Arc<Fn() -> BlockInput + Send + Sync + 'static>;
+pub type KeybdBindMap = HashMap<KeybdKey, Bind>;
+pub type MouseBindMap = HashMap<MouseButton, Bind>;
 
 lazy_static! {
     pub static ref KEYBD_BINDS: Mutex<KeybdBindMap> = Mutex::new(KeybdBindMap::new());

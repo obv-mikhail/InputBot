@@ -1,4 +1,4 @@
-use inputbot::{KeybdKey::*, MouseButton::*, *};
+use inputbot::{BlockInput::*, KeybdKey::*, MouseButton::*, *};
 use std::{thread::sleep, time::Duration};
 
 fn main() {
@@ -27,6 +27,15 @@ fn main() {
 
     // Move mouse.
     QKey.bind(|| MouseCursor.move_rel(10, 10));
+
+    // Block the A key when left shift is held.
+    AKey.blockable_bind(|| {
+        if LShiftKey.is_pressed() {
+            Block
+        } else {
+            DontBlock
+        }
+    });
 
     // Call this to start listening for bound inputs.
     handle_input_events();

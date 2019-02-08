@@ -101,15 +101,24 @@ unsafe extern "system" fn keybd_proc(code: c_int, w_param: WPARAM, l_param: LPAR
     if KEYBD_BINDS.lock().unwrap().is_empty() {
         unset_hook(&*KEYBD_HHOOK);
     } else if w_param as u32 == WM_KEYDOWN {
-        if let Some(cb) = KEYBD_BINDS
+        if let Some(bind) = KEYBD_BINDS
             .lock()
             .unwrap()
             .get_mut(&KeybdKey::from(u64::from(
                 (*(l_param as *const KBDLLHOOKSTRUCT)).vkCode,
             )))
         {
-            let cb = Arc::clone(cb);
-            spawn(move || cb());
+            match bind {
+                Bind::NormalBind(cb) => {
+                    let cb = Arc::clone(cb);
+                    spawn(move || cb());
+                }
+                Bind::BlockableBind(cb) => {
+                    if let BlockInput::Block = cb() {
+                        return 1;
+                    }
+                }
+            }
         }
     }
     CallNextHookEx(null_mut(), code, w_param, l_param)
@@ -124,9 +133,18 @@ unsafe extern "system" fn mouse_proc(code: c_int, w_param: WPARAM, l_param: LPAR
         WM_MBUTTONDOWN => Some(MouseButton::MiddleButton),
         _ => None,
     } {
-        if let Some(cb) = MOUSE_BINDS.lock().unwrap().get_mut(&event) {
-            let cb = Arc::clone(cb);
-            spawn(move || cb());
+        if let Some(bind) = MOUSE_BINDS.lock().unwrap().get_mut(&event) {
+            match bind {
+                Bind::NormalBind(cb) => {
+                    let cb = Arc::clone(cb);
+                    spawn(move || cb());
+                }
+                Bind::BlockableBind(cb) => {
+                    if let BlockInput::Block = cb() {
+                        return 1;
+                    }
+                }
+            }
         };
     }
     CallNextHookEx(null_mut(), code, w_param, l_param)
