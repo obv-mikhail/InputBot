@@ -1,7 +1,6 @@
 use crate::common::*;
 use std::{thread::sleep, time::Duration};
 
-// TODO: Come up with a better name
 pub enum BlockInput {
     Block,
     DontBlock,
