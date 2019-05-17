@@ -4,7 +4,7 @@ Cross-platform (Windows & Linux) library for simulating input device events (key
 Useful for writing desktop automation programs that collapse long user interactions into single key-presses.
 
 
-# Usage sample
+## Usage sample
 
 ```Rust
 use inputbot::{KeybdKey::*, MouseButton::*, *};
@@ -42,14 +42,14 @@ fn main() {
 }
 ```
 
-# Build Dependencies
-## Debian or Ubuntu based distros
+## Build Dependencies
+### Debian or Ubuntu based distros
 * **libx11-dev**
 * **libxtst-dev**
 * **libudev-dev**
 
-# Runtime Dependencies
-## Debian or Ubuntu based distros
+## Runtime Dependencies
+### Debian or Ubuntu based distros
 * **libinput-dev**
 
 **Note:** libinput requires InputBot to be run with sudo on Linux - `sudo ./target/debug/<program name>`.
