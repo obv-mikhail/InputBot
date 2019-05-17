@@ -1,9 +1,10 @@
 # InputBot [![docs link](https://docs.rs/inputbot/badge.svg)](https://docs.rs/inputbot) [![crates.io version](https://img.shields.io/crates/v/inputbot.svg)](https://crates.io/crates/inputbot) 
-A Rust library for creating global hotkeys, and emulating inputs.
-Unlike AutoHotkey, InputBot handles hotkeys concurrently and supports both Windows and Linux.
+Cross-platform (Windows & Linux) library for simulating input device events (keyboard & mouse) and registering global non-blocking input device event handlers.
 
-# How-To
-The code below demonstrates how to create some simple hotkeys.
+Useful for writing desktop automation programs that collapse long user interactions into single key-presses.
+
+
+# Usage sample
 
 ```Rust
 use inputbot::{KeybdKey::*, MouseButton::*, *};
