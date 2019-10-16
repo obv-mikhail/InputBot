@@ -134,9 +134,24 @@ impl MouseCursor {
 }
 
 impl MouseWheel {
-    pub fn scroll_ver(self, _: i32) {}
-
-    pub fn scroll_hor(self, _: i32) {}
+    pub fn scroll_ver(self, y: i32) {
+        if y < 0 {
+          MouseButton::OtherButton(4).press();
+          MouseButton::OtherButton(4).release();
+        } else {
+          MouseButton::OtherButton(5).press();
+          MouseButton::OtherButton(5).release();
+        }
+    }
+    pub fn scroll_hor(self, x: i32) {
+        if x < 0 {
+          MouseButton::OtherButton(6).press();
+          MouseButton::OtherButton(6).release();
+        } else {
+          MouseButton::OtherButton(7).press();
+          MouseButton::OtherButton(7).release();
+        }
+    }
 }
 
 struct LibinputInterfaceRaw;
