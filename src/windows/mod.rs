@@ -131,6 +131,15 @@ unsafe extern "system" fn mouse_proc(code: c_int, w_param: WPARAM, l_param: LPAR
         WM_LBUTTONDOWN => Some(MouseButton::LeftButton),
         WM_RBUTTONDOWN => Some(MouseButton::RightButton),
         WM_MBUTTONDOWN => Some(MouseButton::MiddleButton),
+        WM_XBUTTONDOWN => {
+            let llhs = &*(l_param as *const MSLLHOOKSTRUCT);
+
+            match HIWORD(llhs.mouseData) {
+                XBUTTON1 => Some(MouseButton::X1Button),
+                XBUTTON2 => Some(MouseButton::X2Button),
+                _ => None,
+            }
+        },
         _ => None,
     } {
         if let Some(bind) = MOUSE_BINDS.lock().unwrap().get_mut(&event) {
