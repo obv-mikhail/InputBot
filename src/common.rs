@@ -11,8 +11,8 @@ pub enum Bind {
     BlockableBind(BlockableBindHandler),
 }
 
-pub type BindHandler = Arc<Fn() + Send + Sync + 'static>;
-pub type BlockableBindHandler = Arc<Fn() -> BlockInput + Send + Sync + 'static>;
+pub type BindHandler = Arc<dyn Fn() + Send + Sync + 'static>;
+pub type BlockableBindHandler = Arc<dyn Fn() -> BlockInput + Send + Sync + 'static>;
 pub type KeybdBindMap = HashMap<KeybdKey, Bind>;
 pub type MouseBindMap = HashMap<MouseButton, Bind>;
 
