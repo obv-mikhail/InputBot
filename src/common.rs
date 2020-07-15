@@ -5,6 +5,7 @@ pub use std::{
     sync::{Arc, Mutex},
     thread::spawn,
 };
+use once_cell::sync::Lazy;
 
 pub enum Bind {
     NormalBind(BindHandler),
@@ -16,7 +17,5 @@ pub type BlockableBindHandler = Arc<dyn Fn() -> BlockInput + Send + Sync + 'stat
 pub type KeybdBindMap = HashMap<KeybdKey, Bind>;
 pub type MouseBindMap = HashMap<MouseButton, Bind>;
 
-lazy_static! {
-    pub static ref KEYBD_BINDS: Mutex<KeybdBindMap> = Mutex::new(KeybdBindMap::new());
-    pub static ref MOUSE_BINDS: Mutex<MouseBindMap> = Mutex::new(MouseBindMap::new());
-}
+pub static KEYBD_BINDS: Lazy<Mutex<KeybdBindMap>> = Lazy::new(|| Mutex::new(KeybdBindMap::new()));
+pub static MOUSE_BINDS: Lazy<Mutex<MouseBindMap>> = Lazy::new(|| Mutex::new(MouseBindMap::new()));

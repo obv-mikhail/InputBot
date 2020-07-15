@@ -9,13 +9,12 @@ use winapi::{
     shared::{minwindef::*, windef::*},
     um::winuser::*,
 };
+use once_cell::sync::Lazy;
 
 mod inputs;
 
-lazy_static! {
-    static ref KEYBD_HHOOK: AtomicPtr<HHOOK__> = AtomicPtr::default();
-    static ref MOUSE_HHOOK: AtomicPtr<HHOOK__> = AtomicPtr::default();
-}
+static KEYBD_HHOOK: Lazy<AtomicPtr<HHOOK__>> = Lazy::new(|| AtomicPtr::default());
+static MOUSE_HHOOK: Lazy<AtomicPtr<HHOOK__>> = Lazy::new(|| AtomicPtr::default());
 
 impl KeybdKey {
     pub fn is_pressed(self) -> bool {
