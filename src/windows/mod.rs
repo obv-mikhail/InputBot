@@ -1,6 +1,6 @@
 use crate::{common::*, public::*};
 use std::{
-    mem::{size_of, transmute, transmute_copy, uninitialized},
+    mem::{size_of, transmute, transmute_copy, MaybeUninit},
     ptr::null_mut,
     sync::atomic::AtomicPtr,
 };
@@ -93,7 +93,7 @@ pub fn handle_input_events() {
     if !KEYBD_BINDS.lock().unwrap().is_empty() {
         set_hook(WH_KEYBOARD_LL, &*KEYBD_HHOOK, keybd_proc);
     };
-    let mut msg: MSG = unsafe { uninitialized() };
+    let mut msg: MSG = unsafe { MaybeUninit::zeroed().assume_init() };
     unsafe { GetMessageW(&mut msg, 0 as HWND, 0, 0) };
 }
 
