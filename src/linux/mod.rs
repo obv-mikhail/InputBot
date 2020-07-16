@@ -15,38 +15,37 @@ use nix::{
     unistd::close,
 };
 use std::{
-    mem::uninitialized, os::unix::io::RawFd, path::Path, ptr::null, thread::sleep, time::Duration,
+    os::unix::io::RawFd, path::Path, thread::sleep, time::Duration, ptr::null, mem::MaybeUninit,
 };
 use uinput::event::relative::Position;
 use x11::{xlib::*, xtest::*};
+use once_cell::sync::Lazy;
 
 mod inputs;
 
 type ButtonStatesMap = HashMap<MouseButton, bool>;
 
-lazy_static! {
-    static ref BUTTON_STATES: Mutex<ButtonStatesMap> = Mutex::new(ButtonStatesMap::new());
-    static ref SEND_DISPLAY: AtomicPtr<Display> = {
-        unsafe { XInitThreads() };
-        AtomicPtr::new(unsafe { XOpenDisplay(null()) })
-    };
-    static ref KEYBD_DEVICE: Mutex<uinput::Device> = {
-        Mutex::new(
-            uinput::default()
-                .unwrap()
-                .name("test")
-                .unwrap()
-                .event(uinput::event::Keyboard::All)
-                .unwrap()
-                .event(Position::X)
-                .unwrap()
-                .event(Position::Y)
-                .unwrap()
-                .create()
-                .unwrap(),
-        )
-    };
-}
+static BUTTON_STATES: Lazy<Mutex<ButtonStatesMap>> = Lazy::new(|| Mutex::new(ButtonStatesMap::new()));
+static SEND_DISPLAY: Lazy<AtomicPtr<Display>> = Lazy::new(|| {
+    unsafe { XInitThreads() };
+    AtomicPtr::new(unsafe { XOpenDisplay(null()) })
+});
+static KEYBD_DEVICE: Lazy<Mutex<uinput::Device>> = Lazy::new(|| {
+    Mutex::new(
+        uinput::default()
+            .unwrap()
+            .name("test")
+            .unwrap()
+            .event(uinput::event::Keyboard::All)
+            .unwrap()
+            .event(Position::X)
+            .unwrap()
+            .event(Position::Y)
+            .unwrap()
+            .create()
+            .unwrap(),
+    )
+});
 
 impl KeybdKey {
     pub fn is_pressed(self) -> bool {
@@ -80,11 +79,11 @@ impl KeybdKey {
             KeybdKey::CapsLockKey => Some(1),
             _ => None,
         } {
-            let mut state: XKeyboardState = unsafe { uninitialized() };
+            let mut state: XKeyboardState = unsafe { MaybeUninit::zeroed().assume_init() };
             SEND_DISPLAY.with(|display| unsafe {
                 XGetKeyboardControl(display, &mut state);
             });
-            (state.led_mask & key != 0)
+            state.led_mask & key != 0
         } else {
             false
         }
@@ -177,8 +176,7 @@ impl LibinputInterface for LibinputInterfaceRaw {
 }
 
 pub fn handle_input_events() {
-    let udev_context = udev::Context::new().unwrap();
-    let mut libinput_context = Libinput::new_from_udev(LibinputInterfaceRaw, &udev_context);
+    let mut libinput_context = Libinput::new_with_udev(LibinputInterfaceRaw);
     libinput_context
         .udev_assign_seat(&LibinputInterfaceRaw.seat())
         .unwrap();
