@@ -59,19 +59,24 @@ impl MouseButton {
 }
 
 impl MouseCursor {
+    pub fn pos(self) -> (i32, i32) {
+        unsafe {
+            let mut point = MaybeUninit::uninit();
+            GetCursorPos(point.as_mut_ptr());
+            let point = point.assume_init();
+            (point.x, point.y)
+        }
+    }
+
     pub fn move_rel(self, dx: i32, dy: i32) {
-        send_mouse_input(MOUSEEVENTF_MOVE, 0, dx, dy);
+        let (x, y) = Self.pos();
+        self.move_abs(x + dx, y + dy);
     }
 
     pub fn move_abs(self, x: i32, y: i32) {
         unsafe {
-            send_mouse_input(
-                MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE,
-                0,
-                x * 65_335 / GetSystemMetrics(78),
-                y * 65_335 / GetSystemMetrics(79),
-            )
-        };
+            SetCursorPos(x, y);
+        }
     }
 }
 
