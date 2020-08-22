@@ -1,6 +1,6 @@
 use crate::{common::*, public::*};
 use std::{
-    mem::{size_of, transmute, transmute_copy, MaybeUninit},
+    mem::{size_of, transmute_copy, MaybeUninit},
     ptr::null_mut,
     sync::atomic::AtomicPtr,
 };
@@ -77,11 +77,11 @@ impl MouseCursor {
 
 impl MouseWheel {
     pub fn scroll_ver(self, dwheel: i32) {
-        send_mouse_input(MOUSEEVENTF_WHEEL, unsafe { transmute(dwheel * 120) }, 0, 0);
+        send_mouse_input(MOUSEEVENTF_WHEEL, (dwheel * 120) as u32, 0, 0);
     }
 
     pub fn scroll_hor(self, dwheel: i32) {
-        send_mouse_input(MOUSEEVENTF_HWHEEL, unsafe { transmute(dwheel * 120) }, 0, 0);
+        send_mouse_input(MOUSEEVENTF_HWHEEL, (dwheel * 120) as u32, 0, 0);
     }
 }
 
