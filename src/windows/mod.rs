@@ -1,6 +1,6 @@
 use crate::{common::*, public::*};
 use std::{
-    mem::{size_of, transmute, transmute_copy, MaybeUninit},
+    mem::{size_of, transmute_copy, MaybeUninit},
     ptr::null_mut,
     sync::atomic::AtomicPtr,
 };
