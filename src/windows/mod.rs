@@ -13,8 +13,8 @@ use once_cell::sync::Lazy;
 
 mod inputs;
 
-static KEYBD_HHOOK: Lazy<AtomicPtr<HHOOK__>> = Lazy::new(|| AtomicPtr::default());
-static MOUSE_HHOOK: Lazy<AtomicPtr<HHOOK__>> = Lazy::new(|| AtomicPtr::default());
+static KEYBD_HHOOK: Lazy<AtomicPtr<HHOOK__>> = Lazy::new(AtomicPtr::default);
+static MOUSE_HHOOK: Lazy<AtomicPtr<HHOOK__>> = Lazy::new(AtomicPtr::default);
 
 impl KeybdKey {
     pub fn is_pressed(self) -> bool {
