@@ -26,7 +26,7 @@ fn main() {
     RKey.bind(|| KeySequence("Sample text").send());
 
     // Move mouse.
-    QKey.bind(|| MouseCursor.move_rel(10, 10));
+    QKey.bind(|| MouseCursor::move_rel(10, 10));
 
     // Block the A key when left shift is held.
     AKey.blockable_bind(|| {

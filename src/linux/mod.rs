@@ -106,7 +106,7 @@ impl MouseButton {
 }
 
 impl MouseCursor {
-    pub fn move_rel(self, x: i32, y: i32) {
+    pub fn move_rel(x: i32, y: i32) {
         KEYBD_DEVICE
             .lock()
             .unwrap()
@@ -123,7 +123,7 @@ impl MouseCursor {
         //});
     }
 
-    pub fn move_abs(self, x: i32, y: i32) {
+    pub fn move_abs(x: i32, y: i32) {
         //KEYBD_DEVICE.lock().unwrap().position(&Position::X, x).unwrap();
         //KEYBD_DEVICE.lock().unwrap().position(&Position::Y, y).unwrap();
         SEND_DISPLAY.with(|display| unsafe {
@@ -133,7 +133,7 @@ impl MouseCursor {
 }
 
 impl MouseWheel {
-    pub fn scroll_ver(self, y: i32) {
+    pub fn scroll_ver(y: i32) {
         if y < 0 {
           MouseButton::OtherButton(4).press();
           MouseButton::OtherButton(4).release();
@@ -142,7 +142,7 @@ impl MouseWheel {
           MouseButton::OtherButton(5).release();
         }
     }
-    pub fn scroll_hor(self, x: i32) {
+    pub fn scroll_hor(x: i32) {
         if x < 0 {
           MouseButton::OtherButton(6).press();
           MouseButton::OtherButton(6).release();

@@ -35,7 +35,7 @@ fn main() {
     RKey.bind(|| KeySequence("Sample text").send());
 
     // Move mouse.
-    QKey.bind(|| MouseCursor.move_rel(10, 10));
+    QKey.bind(|| MouseCursor::move_rel(10, 10));
 
     // Call this to start listening for bound inputs.
     handle_input_events();
