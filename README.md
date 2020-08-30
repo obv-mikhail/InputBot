@@ -1,8 +1,7 @@
 # InputBot [![docs link](https://docs.rs/inputbot/badge.svg)](https://docs.rs/inputbot) [![crates.io version](https://img.shields.io/crates/v/inputbot.svg)](https://crates.io/crates/inputbot) 
-Cross-platform (Windows & Linux) library for simulating input device events (keyboard & mouse) and registering global non-blocking input device event handlers.
+Cross-platform (Windows & Linux) library for simulating keyboard/mouse input events and registering global input device event handlers.
 
-Useful for writing desktop automation programs that collapse long user interactions into single key-presses.
-
+Allows writing automation programs that collapse long action-sequences into single key-presses.
 
 ## Usage sample
 

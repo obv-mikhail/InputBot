@@ -1,8 +1,8 @@
 [package]
 name = "inputbot"
-version = "0.4.0"
+version = "0.5.0"
 authors = ["obv-mikhail <obv.mikhail@gmail.com>"]
-description = "A library for creating global hotkeys, and emulating inputs. Unlike AutoHotkey, InputBot handles hotkeys concurrently and supports both Windows and Linux."
+description = "Cross-platform (Windows & Linux) library for simulating keyboard/mouse input events and registering global input device event handlers."
 documentation = "https://docs.rs/inputbot"
 homepage = "https://github.com/obv-mikhail/inputbot"
 repository = "https://github.com/obv-mikhail/inputbot"
