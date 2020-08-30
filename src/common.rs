@@ -9,10 +9,12 @@ use once_cell::sync::Lazy;
 
 pub enum Bind {
     NormalBind(BindHandler),
+    BlockBind(BlockBindHandler),
     BlockableBind(BlockableBindHandler),
 }
 
 pub type BindHandler = Arc<dyn Fn() + Send + Sync + 'static>;
+pub type BlockBindHandler = Arc<dync Fn() + Send + Sync + 'static>;
 pub type BlockableBindHandler = Arc<dyn Fn() -> BlockInput + Send + Sync + 'static>;
 pub type KeybdBindMap = HashMap<KeybdKey, Bind>;
 pub type MouseBindMap = HashMap<MouseButton, Bind>;

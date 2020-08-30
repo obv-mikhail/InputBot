@@ -122,6 +122,13 @@ impl KeybdKey {
             .insert(self, Bind::NormalBind(Arc::new(callback)));
     }
 
+    pub fn block_bind<F: Fn() + Send + Sync + 'static>(self, callback: F) {
+        KEYBD_BINDS
+            .lock()
+            .unwrap()
+            .insert(self, Bind::BlockBind(Arc::new(callback)));
+    }
+
     pub fn blockable_bind<F: Fn() -> BlockInput + Send + Sync + 'static>(self, callback: F) {
         KEYBD_BINDS
             .lock()
@@ -140,6 +147,13 @@ impl MouseButton {
             .lock()
             .unwrap()
             .insert(self, Bind::NormalBind(Arc::new(callback)));
+    }
+
+    pub fn block_bind<F: Fn() + Send + Sync + 'static>(self, callback: F) {
+        KEYBD_BINDS
+            .lock()
+            .unwrap()
+            .insert(self, Bind::BlockBind(Arc::new(callback)));
     }
 
     pub fn blockable_bind<F: Fn() -> BlockInput + Send + Sync + 'static>(self, callback: F) {
