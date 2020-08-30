@@ -29,6 +29,8 @@ fn main() {
     QKey.bind(|| MouseCursor::move_rel(10, 10));
 
     // Block the A key when left shift is held.
+    // Note: callbacks for blockable binds won't be executed in new threads, 
+    //    so for long-running processes create new threads inside the callback if needed. 
     AKey.blockable_bind(|| {
         if LShiftKey.is_pressed() {
             Block
@@ -36,6 +38,9 @@ fn main() {
             DontBlock
         }
     });
+
+    // Block the A key when left shift is held.
+    KKey.block_bind(|| ());
 
     // Call this to start listening for bound inputs.
     handle_input_events();

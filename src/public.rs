@@ -150,7 +150,7 @@ impl MouseButton {
     }
 
     pub fn block_bind<F: Fn() + Send + Sync + 'static>(self, callback: F) {
-        KEYBD_BINDS
+        MOUSE_BINDS
             .lock()
             .unwrap()
             .insert(self, Bind::BlockBind(Arc::new(callback)));
