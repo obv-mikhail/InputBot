@@ -7,6 +7,7 @@ pub enum BlockInput {
 }
 
 #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
+#[repr(u64)]
 pub enum KeybdKey {
     BackspaceKey,
     TabKey,

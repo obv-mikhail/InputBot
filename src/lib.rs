@@ -12,3 +12,8 @@ pub use crate::windows::*;
 mod linux;
 #[cfg(target_os = "linux")]
 pub use crate::linux::*;
+
+#[cfg(target_os = "macos")]
+mod mac;
+#[cfg(target_os = "macos")]
+pub use crate::mac::*;
