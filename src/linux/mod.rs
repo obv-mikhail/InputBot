@@ -75,6 +75,7 @@ impl KeybdKey {
 
     pub fn is_toggled(self) -> bool {
         if let Some(key) = match self {
+            KeybdKey::ScrollLockKey => Some(4),
             KeybdKey::NumLockKey => Some(2),
             KeybdKey::CapsLockKey => Some(1),
             _ => None,

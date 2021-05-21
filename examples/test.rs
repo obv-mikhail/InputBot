@@ -2,6 +2,7 @@ use inputbot::{BlockInput::*, KeybdKey::*, MouseButton::*, *};
 use std::{thread::sleep, time::Duration};
 
 fn main() {
+
     // Autorun for videogames.
     NumLockKey.bind(|| {
         while NumLockKey.is_toggled() {
