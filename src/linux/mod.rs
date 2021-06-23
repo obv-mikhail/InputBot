@@ -15,7 +15,11 @@ use nix::{
     unistd::close,
 };
 use std::{
-    os::unix::io::RawFd, path::Path, thread::sleep, time::Duration, ptr::null, mem::MaybeUninit,
+    os::{
+        unix::io::RawFd,
+        raw::c_char,
+    },
+    path::Path, thread::sleep, time::Duration, ptr::null, mem::MaybeUninit,
 };
 use uinput::event::relative::Position;
 use x11::{xlib::*, xtest::*};
@@ -50,9 +54,9 @@ static KEYBD_DEVICE: Lazy<Mutex<uinput::Device>> = Lazy::new(|| {
 impl KeybdKey {
     pub fn is_pressed(self) -> bool {
         let code = get_key_code(u64::from(self) as _);
-        let mut array: [i8; 32] = [0; 32];
+        let mut array: [c_char; 32] = [0; 32];
         SEND_DISPLAY.with(|display| unsafe {
-            XQueryKeymap(display, &mut array as *mut [i8; 32] as *mut i8);
+            XQueryKeymap(display, &mut array as *mut [c_char; 32] as *mut c_char);
         });
         array[(code >> 3) as usize] & (1 << (code & 7)) != 0
     }
