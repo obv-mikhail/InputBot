@@ -112,27 +112,14 @@ impl MouseButton {
 
 impl MouseCursor {
     pub fn move_rel(x: i32, y: i32) {
-        KEYBD_DEVICE
-            .lock()
-            .unwrap()
-            .position(&Position::X, x)
-            .unwrap();
-        KEYBD_DEVICE
-            .lock()
-            .unwrap()
-            .position(&Position::Y, y)
-            .unwrap();
-        KEYBD_DEVICE.lock().unwrap().synchronize().unwrap();
-        //SEND_DISPLAY.with(|display| unsafe {
-        //    XWarpPointer(display, 0, 0, 0, 0, 0, 0, x, y);
-        //});
+        SEND_DISPLAY.with(|display| unsafe {
+            XWarpPointer(display, 0, 0, 0, 0, 0, 0, x, y);
+        });
     }
 
     pub fn move_abs(x: i32, y: i32) {
-        //KEYBD_DEVICE.lock().unwrap().position(&Position::X, x).unwrap();
-        //KEYBD_DEVICE.lock().unwrap().position(&Position::Y, y).unwrap();
         SEND_DISPLAY.with(|display| unsafe {
-            XWarpPointer(display, 0, 0, 0, 0, 0, 0, x, y);
+            XWarpPointer(display, 0, XRootWindow(display, XDefaultScreen(display)), 0, 0, 0, 0, x, y);
         });
     }
 }
