@@ -288,3 +288,17 @@ pub fn key_to_scan_code(key: KeybdKey) -> i32 {
         _ => 0x0,
     }
 }
+
+impl From<MouseButton> for uinput::event::controller::Mouse {
+    fn from(button: MouseButton) -> Self {
+        use uinput::event::controller::Mouse;
+        match button {
+            MouseButton::LeftButton => Mouse::Left,
+            MouseButton::RightButton => Mouse::Right,
+            MouseButton::MiddleButton => Mouse::Middle,
+            MouseButton::X1Button => unimplemented!(),
+            MouseButton::X2Button => unimplemented!(),
+            MouseButton::OtherButton(_) => unimplemented!(),
+        }
+    }
+}
