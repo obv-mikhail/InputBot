@@ -21,7 +21,7 @@ use std::{
     },
     path::Path, thread::sleep, time::Duration, ptr::null, mem::MaybeUninit,
 };
-use uinput::event::relative::Position;
+use uinput::event::{controller::{Controller, Mouse}, Event as UinputEvent, relative::Position};
 use x11::{xlib::*, xtest::*};
 use once_cell::sync::Lazy;
 
@@ -38,9 +38,25 @@ static KEYBD_DEVICE: Lazy<Mutex<uinput::Device>> = Lazy::new(|| {
     Mutex::new(
         uinput::default()
             .unwrap()
-            .name("test")
+            .name("inputbot")
             .unwrap()
             .event(uinput::event::Keyboard::All)
+            .unwrap()
+            .event(UinputEvent::Controller(Controller::Mouse(Mouse::Left)))
+            .unwrap()
+            .event(UinputEvent::Controller(Controller::Mouse(Mouse::Right)))
+            .unwrap()
+            .event(UinputEvent::Controller(Controller::Mouse(Mouse::Middle)))
+            .unwrap()
+            .event(UinputEvent::Controller(Controller::Mouse(Mouse::Side)))
+            .unwrap()
+            .event(UinputEvent::Controller(Controller::Mouse(Mouse::Extra)))
+            .unwrap()
+            .event(UinputEvent::Controller(Controller::Mouse(Mouse::Forward)))
+            .unwrap()
+            .event(UinputEvent::Controller(Controller::Mouse(Mouse::Back)))
+            .unwrap()
+            .event(UinputEvent::Controller(Controller::Mouse(Mouse::Task)))
             .unwrap()
             .event(Position::X)
             .unwrap()
@@ -50,6 +66,7 @@ static KEYBD_DEVICE: Lazy<Mutex<uinput::Device>> = Lazy::new(|| {
             .unwrap(),
     )
 });
+
 
 impl KeybdKey {
     pub fn is_pressed(self) -> bool {
@@ -101,12 +118,15 @@ impl MouseButton {
     }
 
     pub fn press(self) {
-        //KEYBD_DEVICE.lock().unwrap().write(0x01, key_to_scan_code(self), 1).unwrap();
-        send_mouse_input(u32::from(self), 1);
+        let mut device = KEYBD_DEVICE.lock().unwrap();
+        device.press(&Controller::Mouse(Mouse::from(self))).unwrap();
+        device.synchronize().unwrap();
     }
 
     pub fn release(self) {
-        send_mouse_input(u32::from(self), 0);
+        let mut device = KEYBD_DEVICE.lock().unwrap();
+        device.release(&Controller::Mouse(Mouse::from(self))).unwrap();
+        device.synchronize().unwrap();
     }
 }
 
