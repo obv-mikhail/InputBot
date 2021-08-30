@@ -28,8 +28,10 @@ use once_cell::sync::Lazy;
 mod inputs;
 
 type ButtonStatesMap = HashMap<MouseButton, bool>;
+type KeyStatesMap = HashMap<KeybdKey, bool>;
 
 static BUTTON_STATES: Lazy<Mutex<ButtonStatesMap>> = Lazy::new(|| Mutex::new(ButtonStatesMap::new()));
+static KEY_STATES: Lazy<Mutex<KeyStatesMap>> = Lazy::new(|| Mutex::new(KeyStatesMap::new()));
 static SEND_DISPLAY: Lazy<AtomicPtr<Display>> = Lazy::new(|| {
     unsafe { XInitThreads() };
     AtomicPtr::new(unsafe { XOpenDisplay(null()) })
@@ -70,12 +72,7 @@ static KEYBD_DEVICE: Lazy<Mutex<uinput::Device>> = Lazy::new(|| {
 
 impl KeybdKey {
     pub fn is_pressed(self) -> bool {
-        let code = get_key_code(u64::from(self) as _);
-        let mut array: [c_char; 32] = [0; 32];
-        SEND_DISPLAY.with(|display| unsafe {
-            XQueryKeymap(display, &mut array as *mut [c_char; 32] as *mut c_char);
-        });
-        array[(code >> 3) as usize] & (1 << (code & 7)) != 0
+        *KEY_STATES.lock().unwrap().entry(self).or_insert(false)
     }
 
     pub fn press(self) {
@@ -208,10 +205,13 @@ fn handle_input_event(event: Event) {
             let key = keyboard_key_event.key();
             if let Some(keybd_key) = scan_code_to_key(key) {
                 if keyboard_key_event.key_state() == KeyState::Pressed {
+                    KEY_STATES.lock().unwrap().insert(keybd_key, true);
                     if let Some(Bind::NormalBind(cb)) = KEYBD_BINDS.lock().unwrap().get(&keybd_key) {
                         let cb = Arc::clone(cb);
                         spawn(move || cb());
                     };
+                } else {
+                    KEY_STATES.lock().unwrap().insert(keybd_key, false);
                 }
             }
         }
