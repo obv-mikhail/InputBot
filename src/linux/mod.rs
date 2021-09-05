@@ -36,7 +36,7 @@ static SEND_DISPLAY: Lazy<AtomicPtr<Display>> = Lazy::new(|| {
     unsafe { XInitThreads() };
     AtomicPtr::new(unsafe { XOpenDisplay(null()) })
 });
-static KEYBD_DEVICE: Lazy<Mutex<uinput::Device>> = Lazy::new(|| {
+static FAKE_DEVICE: Lazy<Mutex<uinput::Device>> = Lazy::new(|| {
     Mutex::new(
         uinput::default()
             .unwrap()
@@ -76,7 +76,7 @@ impl KeybdKey {
     }
 
     pub fn press(self) {
-        KEYBD_DEVICE
+        FAKE_DEVICE
             .lock()
             .unwrap()
             .write(0x01, key_to_scan_code(self), 1)
@@ -84,7 +84,7 @@ impl KeybdKey {
     }
 
     pub fn release(self) {
-        KEYBD_DEVICE
+        FAKE_DEVICE
             .lock()
             .unwrap()
             .write(0x01, key_to_scan_code(self), 0)
@@ -115,13 +115,13 @@ impl MouseButton {
     }
 
     pub fn press(self) {
-        let mut device = KEYBD_DEVICE.lock().unwrap();
+        let mut device = FAKE_DEVICE.lock().unwrap();
         device.press(&Controller::Mouse(Mouse::from(self))).unwrap();
         device.synchronize().unwrap();
     }
 
     pub fn release(self) {
-        let mut device = KEYBD_DEVICE.lock().unwrap();
+        let mut device = FAKE_DEVICE.lock().unwrap();
         device.release(&Controller::Mouse(Mouse::from(self))).unwrap();
         device.synchronize().unwrap();
     }
