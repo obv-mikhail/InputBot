@@ -46,9 +46,6 @@ fn main() {
 * **libx11-dev**
 * **libxtst-dev**
 * **libudev-dev**
-
-## Runtime Dependencies
-### Debian or Ubuntu based distros
 * **libinput-dev**
 
 **Note:** libinput requires InputBot to be run with sudo on Linux - `sudo ./target/debug/<program name>`.

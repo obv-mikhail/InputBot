@@ -15,14 +15,11 @@ use nix::{
     unistd::close,
 };
 use std::{
-    os::{
-        unix::io::RawFd,
-        raw::c_char,
-    },
+    os::unix::io::RawFd,
     path::Path, thread::sleep, time::Duration, ptr::null, mem::MaybeUninit,
 };
 use uinput::event::{controller::{Controller, Mouse}, Event as UinputEvent, relative::Position};
-use x11::{xlib::*, xtest::*};
+use x11::xlib::*;
 use once_cell::sync::Lazy;
 
 mod inputs;
@@ -36,7 +33,7 @@ static SEND_DISPLAY: Lazy<AtomicPtr<Display>> = Lazy::new(|| {
     unsafe { XInitThreads() };
     AtomicPtr::new(unsafe { XOpenDisplay(null()) })
 });
-static KEYBD_DEVICE: Lazy<Mutex<uinput::Device>> = Lazy::new(|| {
+static FAKE_DEVICE: Lazy<Mutex<uinput::Device>> = Lazy::new(|| {
     Mutex::new(
         uinput::default()
             .unwrap()
@@ -76,7 +73,7 @@ impl KeybdKey {
     }
 
     pub fn press(self) {
-        KEYBD_DEVICE
+        FAKE_DEVICE
             .lock()
             .unwrap()
             .write(0x01, key_to_scan_code(self), 1)
@@ -84,7 +81,7 @@ impl KeybdKey {
     }
 
     pub fn release(self) {
-        KEYBD_DEVICE
+        FAKE_DEVICE
             .lock()
             .unwrap()
             .write(0x01, key_to_scan_code(self), 0)
@@ -115,13 +112,13 @@ impl MouseButton {
     }
 
     pub fn press(self) {
-        let mut device = KEYBD_DEVICE.lock().unwrap();
+        let mut device = FAKE_DEVICE.lock().unwrap();
         device.press(&Controller::Mouse(Mouse::from(self))).unwrap();
         device.synchronize().unwrap();
     }
 
     pub fn release(self) {
-        let mut device = KEYBD_DEVICE.lock().unwrap();
+        let mut device = FAKE_DEVICE.lock().unwrap();
         device.release(&Controller::Mouse(Mouse::from(self))).unwrap();
         device.synchronize().unwrap();
     }
@@ -240,16 +237,6 @@ fn handle_input_event(event: Event) {
         }
         _ => {}
     }
-}
-
-fn get_key_code(code: u64) -> u8 {
-    SEND_DISPLAY.with(|display| unsafe { XKeysymToKeycode(display, code) })
-}
-
-fn send_mouse_input(button: u32, is_press: i32) {
-    SEND_DISPLAY.with(|display| unsafe {
-        XTestFakeButtonEvent(display, button, is_press, 0);
-    });
 }
 
 trait DisplayAcquirable {
