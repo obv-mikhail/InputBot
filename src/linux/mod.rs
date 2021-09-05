@@ -15,14 +15,11 @@ use nix::{
     unistd::close,
 };
 use std::{
-    os::{
-        unix::io::RawFd,
-        raw::c_char,
-    },
+    os::unix::io::RawFd,
     path::Path, thread::sleep, time::Duration, ptr::null, mem::MaybeUninit,
 };
 use uinput::event::{controller::{Controller, Mouse}, Event as UinputEvent, relative::Position};
-use x11::{xlib::*, xtest::*};
+use x11::xlib::*;
 use once_cell::sync::Lazy;
 
 mod inputs;
@@ -240,16 +237,6 @@ fn handle_input_event(event: Event) {
         }
         _ => {}
     }
-}
-
-fn get_key_code(code: u64) -> u8 {
-    SEND_DISPLAY.with(|display| unsafe { XKeysymToKeycode(display, code) })
-}
-
-fn send_mouse_input(button: u32, is_press: i32) {
-    SEND_DISPLAY.with(|display| unsafe {
-        XTestFakeButtonEvent(display, button, is_press, 0);
-    });
 }
 
 trait DisplayAcquirable {
