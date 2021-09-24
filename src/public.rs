@@ -168,7 +168,7 @@ impl MouseButton {
     }
 }
 
-fn get_keybd_key(c: char) -> Option<KeybdKey> {
+pub fn get_keybd_key(c: char) -> Option<KeybdKey> {
     match c {
         ' ' => Some(KeybdKey::SpaceKey),
         'A' | 'a' => Some(KeybdKey::AKey),
