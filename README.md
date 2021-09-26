@@ -30,6 +30,11 @@ fn main() {
         }
     });
 
+    // Create a handler to trigger on any and all keyboard events.
+    inputbot::KeybdKey::bind_all(|evnt| {
+        println!("{:?}", evnt);
+    });
+
     // Send a key sequence.
     RKey.bind(|| KeySequence("Sample text").send());
 

@@ -29,6 +29,15 @@ fn main() {
     // Move mouse.
     QKey.bind(|| MouseCursor::move_rel(10, 10));
 
+    // Bind all keys to a common callback event.
+    KeybdKey::bind_all(|event| {
+        match inputbot::from_keybd_key(event) {
+            Some(c) => println!("{}", c),
+            None => println!("{}", "Unregistered Key")
+        };
+    });
+
+    inputbot::handle_input_events();
     // Block the A key when left shift is held.
     // Note: callbacks for blockable binds won't be executed in new threads, 
     //    so for long-running processes create new threads inside the callback if needed. 

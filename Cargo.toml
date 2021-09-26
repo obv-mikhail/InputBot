@@ -13,6 +13,8 @@ license = "MIT"
 edition = "2018"
 
 [dependencies]
+strum = { version = "0.21.0", features = ["derive"] }
+strum_macros = "0.21.0"
 once_cell = "1.8.0"
 
 [target.'cfg(windows)'.dependencies]
