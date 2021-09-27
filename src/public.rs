@@ -1,12 +1,15 @@
 use crate::common::*;
 use std::{thread::sleep, time::Duration};
 
+use strum::IntoEnumIterator;
+use strum_macros::EnumIter;
+
 pub enum BlockInput {
     Block,
     DontBlock,
 }
 
-#[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
+#[derive(Debug, Eq, PartialEq, Hash, Copy, Clone, EnumIter)]
 pub enum KeybdKey {
     BackspaceKey,
     TabKey,
@@ -97,6 +100,8 @@ pub enum KeybdKey {
     RShiftKey,
     LControlKey,
     RControlKey,
+
+    #[strum(disabled)]
     OtherKey(u64),
 }
 
@@ -136,6 +141,19 @@ impl KeybdKey {
             .insert(self, Bind::BlockableBind(Arc::new(callback)));
     }
 
+    pub fn bind_all<F: Fn(KeybdKey) + Send + Sync + Copy + 'static>(callback: F) {
+        for key in KeybdKey::iter() {
+            let fire = move || {
+                callback(key);
+            };
+
+            KEYBD_BINDS
+                .lock()
+                .unwrap()
+                .insert(key, Bind::NormalBind(Arc::new(fire)));
+        }
+    }
+
     pub fn unbind(self) {
         KEYBD_BINDS.lock().unwrap().remove(&self);
     }
@@ -168,7 +186,59 @@ impl MouseButton {
     }
 }
 
-fn get_keybd_key(c: char) -> Option<KeybdKey> {
+pub fn from_keybd_key(k: KeybdKey) -> Option<char> {
+    match k {
+        KeybdKey::AKey => Some('a'),
+        KeybdKey::BKey => Some('b'),
+        KeybdKey::CKey => Some('c'),
+        KeybdKey::DKey => Some('d'),
+        KeybdKey::EKey => Some('e'),
+        KeybdKey::FKey => Some('f'),
+        KeybdKey::GKey => Some('g'),
+        KeybdKey::HKey => Some('h'),
+        KeybdKey::IKey => Some('i'),
+        KeybdKey::JKey => Some('j'),
+        KeybdKey::KKey => Some('k'),
+        KeybdKey::LKey => Some('l'),
+        KeybdKey::MKey => Some('m'),
+        KeybdKey::NKey => Some('n'),
+        KeybdKey::OKey => Some('o'),
+        KeybdKey::PKey => Some('p'),
+        KeybdKey::QKey => Some('q'),
+        KeybdKey::RKey => Some('r'),
+        KeybdKey::SKey => Some('s'),
+        KeybdKey::TKey => Some('t'),
+        KeybdKey::UKey => Some('u'),
+        KeybdKey::VKey => Some('v'),
+        KeybdKey::WKey => Some('w'),
+        KeybdKey::XKey => Some('x'),
+        KeybdKey::YKey => Some('y'),
+        KeybdKey::ZKey => Some('z'),
+        KeybdKey::Numpad0Key => Some('0'),
+        KeybdKey::Numpad1Key => Some('1'),
+        KeybdKey::Numpad2Key => Some('2'),
+        KeybdKey::Numpad3Key => Some('3'),
+        KeybdKey::Numpad4Key => Some('4'),
+        KeybdKey::Numpad5Key => Some('5'),
+        KeybdKey::Numpad6Key => Some('6'),
+        KeybdKey::Numpad7Key => Some('7'),
+        KeybdKey::Numpad8Key => Some('8'),
+        KeybdKey::Numpad9Key => Some('9'),
+        KeybdKey::Numrow0Key => Some('0'),
+        KeybdKey::Numrow1Key => Some('1'),
+        KeybdKey::Numrow2Key => Some('2'),
+        KeybdKey::Numrow3Key => Some('3'),
+        KeybdKey::Numrow4Key => Some('4'),
+        KeybdKey::Numrow5Key => Some('5'),
+        KeybdKey::Numrow6Key => Some('6'),
+        KeybdKey::Numrow7Key => Some('7'),
+        KeybdKey::Numrow8Key => Some('8'),
+        KeybdKey::Numrow9Key => Some('9'),
+        _ => None
+    }
+}
+
+pub fn get_keybd_key(c: char) -> Option<KeybdKey> {
     match c {
         ' ' => Some(KeybdKey::SpaceKey),
         'A' | 'a' => Some(KeybdKey::AKey),
