@@ -67,25 +67,36 @@ static FAKE_DEVICE: Lazy<Mutex<uinput::Device>> = Lazy::new(|| {
 });
 
 
+/// Requests the fake device to be generated.
+/// 
+/// Can be called before using the fake device to prevent it from 
+/// building when you first try to use it.
+pub fn init_device() {
+    FAKE_DEVICE.lock().unwrap();
+}
+
+
 impl KeybdKey {
     pub fn is_pressed(self) -> bool {
         *KEY_STATES.lock().unwrap().entry(self).or_insert(false)
     }
 
     pub fn press(self) {
-        FAKE_DEVICE
-            .lock()
-            .unwrap()
+        let mut device = FAKE_DEVICE.lock().unwrap();
+
+        device
             .write(0x01, key_to_scan_code(self), 1)
             .unwrap();
+        device.synchronize().unwrap();
     }
 
     pub fn release(self) {
-        FAKE_DEVICE
-            .lock()
-            .unwrap()
+        let mut device = FAKE_DEVICE.lock().unwrap();
+
+        device
             .write(0x01, key_to_scan_code(self), 0)
             .unwrap();
+        device.synchronize().unwrap();
     }
 
     pub fn is_toggled(self) -> bool {
