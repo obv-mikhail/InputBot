@@ -137,15 +137,24 @@ impl MouseButton {
 
 impl MouseCursor {
     pub fn move_rel(x: i32, y: i32) {
+        let mut device = FAKE_DEVICE.lock().unwrap();
+
+        device.position(&Position::X, x).unwrap();
+        device.position(&Position::Y, y).unwrap();
+
         SEND_DISPLAY.with(|display| unsafe {
             XWarpPointer(display, 0, 0, 0, 0, 0, 0, x, y);
         });
+        device.synchronize().unwrap();
     }
 
     pub fn move_abs(x: i32, y: i32) {
+        let mut device = FAKE_DEVICE.lock().unwrap();
+
         SEND_DISPLAY.with(|display| unsafe {
             XWarpPointer(display, 0, XRootWindow(display, XDefaultScreen(display)), 0, 0, 0, 0, x, y);
         });
+        device.synchronize().unwrap();
     }
 }
 
