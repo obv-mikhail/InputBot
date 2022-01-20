@@ -14,20 +14,24 @@ use nix::{
     sys::stat::Mode,
     unistd::close,
 };
-use std::{
-    os::unix::io::RawFd,
-    path::Path, thread::sleep, time::Duration, ptr::null, mem::MaybeUninit,
-};
-use uinput::event::{controller::{Controller, Mouse}, Event as UinputEvent, relative::Position};
-use x11::xlib::*;
 use once_cell::sync::Lazy;
+use std::{
+    mem::MaybeUninit, os::unix::io::RawFd, path::Path, ptr::null, thread::sleep, time::Duration,
+};
+use uinput::event::{
+    controller::{Controller, Mouse},
+    relative::Position,
+    Event as UinputEvent,
+};
+use x11::xlib::*;
 
 mod inputs;
 
 type ButtonStatesMap = HashMap<MouseButton, bool>;
 type KeyStatesMap = HashMap<KeybdKey, bool>;
 
-static BUTTON_STATES: Lazy<Mutex<ButtonStatesMap>> = Lazy::new(|| Mutex::new(ButtonStatesMap::new()));
+static BUTTON_STATES: Lazy<Mutex<ButtonStatesMap>> =
+    Lazy::new(|| Mutex::new(ButtonStatesMap::new()));
 static KEY_STATES: Lazy<Mutex<KeyStatesMap>> = Lazy::new(|| Mutex::new(KeyStatesMap::new()));
 static SEND_DISPLAY: Lazy<AtomicPtr<Display>> = Lazy::new(|| {
     unsafe { XInitThreads() };
@@ -66,15 +70,13 @@ static FAKE_DEVICE: Lazy<Mutex<uinput::Device>> = Lazy::new(|| {
     )
 });
 
-
 /// Requests the fake device to be generated.
-/// 
-/// Can be called before using the fake device to prevent it from 
+///
+/// Can be called before using the fake device to prevent it from
 /// building when you first try to use it.
 pub fn init_device() {
     FAKE_DEVICE.lock().unwrap();
 }
-
 
 impl KeybdKey {
     pub fn is_pressed(self) -> bool {
@@ -84,18 +86,14 @@ impl KeybdKey {
     pub fn press(self) {
         let mut device = FAKE_DEVICE.lock().unwrap();
 
-        device
-            .write(0x01, key_to_scan_code(self), 1)
-            .unwrap();
+        device.write(0x01, key_to_scan_code(self), 1).unwrap();
         device.synchronize().unwrap();
     }
 
     pub fn release(self) {
         let mut device = FAKE_DEVICE.lock().unwrap();
 
-        device
-            .write(0x01, key_to_scan_code(self), 0)
-            .unwrap();
+        device.write(0x01, key_to_scan_code(self), 0).unwrap();
         device.synchronize().unwrap();
     }
 
@@ -130,7 +128,9 @@ impl MouseButton {
 
     pub fn release(self) {
         let mut device = FAKE_DEVICE.lock().unwrap();
-        device.release(&Controller::Mouse(Mouse::from(self))).unwrap();
+        device
+            .release(&Controller::Mouse(Mouse::from(self)))
+            .unwrap();
         device.synchronize().unwrap();
     }
 }
@@ -152,7 +152,17 @@ impl MouseCursor {
         let mut device = FAKE_DEVICE.lock().unwrap();
 
         SEND_DISPLAY.with(|display| unsafe {
-            XWarpPointer(display, 0, XRootWindow(display, XDefaultScreen(display)), 0, 0, 0, 0, x, y);
+            XWarpPointer(
+                display,
+                0,
+                XRootWindow(display, XDefaultScreen(display)),
+                0,
+                0,
+                0,
+                0,
+                x,
+                y,
+            );
         });
         device.synchronize().unwrap();
     }
@@ -161,20 +171,20 @@ impl MouseCursor {
 impl MouseWheel {
     pub fn scroll_ver(y: i32) {
         if y < 0 {
-          MouseButton::OtherButton(4).press();
-          MouseButton::OtherButton(4).release();
+            MouseButton::OtherButton(4).press();
+            MouseButton::OtherButton(4).release();
         } else {
-          MouseButton::OtherButton(5).press();
-          MouseButton::OtherButton(5).release();
+            MouseButton::OtherButton(5).press();
+            MouseButton::OtherButton(5).release();
         }
     }
     pub fn scroll_hor(x: i32) {
         if x < 0 {
-          MouseButton::OtherButton(6).press();
-          MouseButton::OtherButton(6).release();
+            MouseButton::OtherButton(6).press();
+            MouseButton::OtherButton(6).release();
         } else {
-          MouseButton::OtherButton(7).press();
-          MouseButton::OtherButton(7).release();
+            MouseButton::OtherButton(7).press();
+            MouseButton::OtherButton(7).release();
         }
     }
 }
@@ -218,18 +228,24 @@ pub fn handle_input_events() {
 fn handle_input_event(event: Event) {
     match event {
         Keyboard(keyboard_event) => {
-            let KeyboardEvent::Key(keyboard_key_event) = keyboard_event;
-            let key = keyboard_key_event.key();
-            if let Some(keybd_key) = scan_code_to_key(key) {
-                if keyboard_key_event.key_state() == KeyState::Pressed {
-                    KEY_STATES.lock().unwrap().insert(keybd_key, true);
-                    if let Some(Bind::NormalBind(cb)) = KEYBD_BINDS.lock().unwrap().get(&keybd_key) {
-                        let cb = Arc::clone(cb);
-                        spawn(move || cb());
-                    };
-                } else {
-                    KEY_STATES.lock().unwrap().insert(keybd_key, false);
+            match keyboard_event {
+                KeyboardEvent::Key(keyboard_key_event) => {
+                    let key = keyboard_key_event.key();
+                    if let Some(keybd_key) = scan_code_to_key(key) {
+                        if keyboard_key_event.key_state() == KeyState::Pressed {
+                            KEY_STATES.lock().unwrap().insert(keybd_key, true);
+                            if let Some(Bind::NormalBind(cb)) =
+                                KEYBD_BINDS.lock().unwrap().get(&keybd_key)
+                            {
+                                let cb = Arc::clone(cb);
+                                spawn(move || cb());
+                            };
+                        } else {
+                            KEY_STATES.lock().unwrap().insert(keybd_key, false);
+                        }
+                    }
                 }
+                _ => (),
             }
         }
         Pointer(pointer_event) => {
@@ -245,7 +261,9 @@ fn handle_input_event(event: Event) {
                 } {
                     if button_event.button_state() == ButtonState::Pressed {
                         BUTTON_STATES.lock().unwrap().insert(mouse_button, true);
-                        if let Some(Bind::NormalBind(cb)) = MOUSE_BINDS.lock().unwrap().get(&mouse_button) {
+                        if let Some(Bind::NormalBind(cb)) =
+                            MOUSE_BINDS.lock().unwrap().get(&mouse_button)
+                        {
                             let cb = Arc::clone(cb);
                             spawn(move || cb());
                         };
