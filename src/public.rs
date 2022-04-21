@@ -100,6 +100,17 @@ pub enum KeybdKey {
     RShiftKey,
     LControlKey,
     RControlKey,
+    BackquoteKey,
+    SlashKey,
+    BackslashKey,
+    CommaKey,
+    PeriodKey,
+    MinusKey,
+    QuoteKey,
+    SemicolonKey,
+    LBracketKey,
+    RBracketKey,
+    EqualKey,
 
     #[strum(disabled)]
     OtherKey(u64),
@@ -234,7 +245,17 @@ pub fn from_keybd_key(k: KeybdKey) -> Option<char> {
         KeybdKey::Numrow7Key => Some('7'),
         KeybdKey::Numrow8Key => Some('8'),
         KeybdKey::Numrow9Key => Some('9'),
-        _ => None
+        KeybdKey::BackslashKey => Some('\\'),
+        KeybdKey::SlashKey => Some('/'),
+        KeybdKey::CommaKey => Some(','),
+        KeybdKey::PeriodKey => Some('.'),
+        KeybdKey::MinusKey => Some('-'),
+        KeybdKey::QuoteKey => Some('"'),
+        KeybdKey::SemicolonKey => Some(';'),
+        KeybdKey::LBracketKey => Some('['),
+        KeybdKey::RBracketKey => Some(']'),
+        KeybdKey::EqualKey => Some('='),
+        _ => None,
     }
 }
 
@@ -267,6 +288,27 @@ pub fn get_keybd_key(c: char) -> Option<KeybdKey> {
         'X' | 'x' => Some(KeybdKey::XKey),
         'Y' | 'y' => Some(KeybdKey::YKey),
         'Z' | 'z' => Some(KeybdKey::ZKey),
+        '0' | ')' => Some(KeybdKey::Numrow0Key),
+        '1' | '!' => Some(KeybdKey::Numrow1Key),
+        '2' | '@' => Some(KeybdKey::Numrow2Key),
+        '3' | '#' => Some(KeybdKey::Numrow3Key),
+        '4' | '$' => Some(KeybdKey::Numrow4Key),
+        '5' | '%' => Some(KeybdKey::Numrow5Key),
+        '6' | '^' => Some(KeybdKey::Numrow6Key),
+        '7' | '&' => Some(KeybdKey::Numrow7Key),
+        '8' | '*' => Some(KeybdKey::Numrow8Key),
+        '9' | '(' => Some(KeybdKey::Numrow9Key),
+        '`' | '~' => Some(KeybdKey::BackquoteKey),
+        '/' | '?' => Some(KeybdKey::SlashKey),
+        ',' | '<' => Some(KeybdKey::CommaKey),
+        '.' | '>' => Some(KeybdKey::PeriodKey),
+        '-' | '_' => Some(KeybdKey::MinusKey),
+        ';' | ':' => Some(KeybdKey::SemicolonKey),
+        '[' | '{' => Some(KeybdKey::LBracketKey),
+        ']' | '}' => Some(KeybdKey::RBracketKey),
+        '=' | '+' => Some(KeybdKey::EqualKey),
+        '\\' | '|' => Some(KeybdKey::BackslashKey),
+        '\'' | '"' => Some(KeybdKey::QuoteKey),
         _ => None,
     }
 }
@@ -277,18 +319,28 @@ impl KeySequence {
     pub fn send(&self) {
         for c in self.0.chars() {
             let mut uppercase = false;
+
             if let Some(keybd_key) = {
-                if c.is_uppercase() {
+                if c.is_uppercase()
+                    || [
+                        '!', '@', '#', '$', '%', '^', '&', '*', '(', ')', '_', '+', '{', '}', '|',
+                        ':', '"', '<', '>', '?', '~',
+                    ]
+                    .contains(&c)
+                {
                     uppercase = true;
                 }
+
                 get_keybd_key(c)
             } {
                 if uppercase {
                     KeybdKey::LShiftKey.press();
                 }
+
                 keybd_key.press();
                 sleep(Duration::from_millis(20));
                 keybd_key.release();
+
                 if uppercase {
                     KeybdKey::LShiftKey.release();
                 }
