@@ -1,7 +1,7 @@
-use inputbot::KeybdKey;
+use inputbot::{KeybdKey, MouseButton};
 
-/// This example demonstrates binding all of the keyboard keys to a simple callback.
-/// The callback prints the key that was pressed, if it is found.
+/// This example demonstrates binding all of the keyboard and mouse buttons to a simple function.
+/// The function prints the key or button that was pressed.
 
 fn main() {
     // This is not strictly neccesary, but by calling this function, you can avoid a 'startup delay'
@@ -14,6 +14,11 @@ fn main() {
             Some(c) => println!("{c}"),
             None => println!("Unregistered Key"),
         };
+    });
+
+    // Bind all mouse buttons to a common callback event.
+    MouseButton::bind_all(|event| {
+        println!("{:?}", event);
     });
 
     // Call this to start listening for bound inputs.
