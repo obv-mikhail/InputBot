@@ -5,7 +5,7 @@ Allows writing automation programs that collapse long action-sequences into sing
 
 ## Usage sample
 
-```Rust
+```rust
 use inputbot::{KeybdKey::*, MouseButton::*, *};
 use std::{thread::sleep, time::Duration};
 
@@ -47,10 +47,18 @@ fn main() {
 ```
 
 ## Build Dependencies
+
 ### Debian or Ubuntu based distros
+
 * **libx11-dev**
 * **libxtst-dev**
 * **libudev-dev**
 * **libinput-dev**
 
 **Note:** libinput requires InputBot to be run with sudo on Linux - `sudo ./target/debug/<program name>`.
+
+## Examples
+
+You can run the included examples by cloning the library and running `cargo run --example <example name>`. Similar to the note above, on Linux you have to run `cargo build --examples && sudo ./target/debug/<example name>`.
+
+This is especially useful for testing the library when contributing.
