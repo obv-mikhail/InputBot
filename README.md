@@ -41,7 +41,7 @@ fn main() {
 inputbot = { git = "https://github.com/obv-mikhail/InputBot", branch = "develop" }
 ```
 
-Check out **[examples]("/examples/")** for comprehensive examples on how to use each feature.
+Check out **[examples](/examples)** for comprehensive examples on how to use each feature.
 
 ## Build Dependencies
 
