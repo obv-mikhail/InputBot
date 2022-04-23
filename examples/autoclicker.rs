@@ -5,10 +5,6 @@ use inputbot::{KeybdKey::*, MouseButton::*};
 /// This example demonstrates simulating mouse clicks.
 
 fn main() {
-    // This is not strictly neccesary, but by calling this function, you can avoid a 'startup delay'
-    // when executing your first callback.
-    inputbot::init_device();
-
     // Bind our right mouse button to a function that autoclicks every 30 milliseconds. Hold it down
     // to bake some cookies really fast!
     RightButton.bind(|| {

@@ -1,11 +1,11 @@
 use crate::public::*;
+use once_cell::sync::Lazy;
 pub use std::{
     collections::hash_map::HashMap,
     sync::atomic::{AtomicPtr, Ordering},
     sync::{Arc, Mutex},
     thread::spawn,
 };
-use once_cell::sync::Lazy;
 
 pub enum Bind {
     NormalBind(BindHandler),
