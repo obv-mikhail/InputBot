@@ -4,6 +4,7 @@ use crate::public::{
 };
 
 impl From<KeybdKey> for u64 {
+    // https://docs.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes?redirectedfrom=MSDN
     fn from(key: KeybdKey) -> u64 {
         match key {
             BackspaceKey => 0x08,
@@ -112,6 +113,7 @@ impl From<KeybdKey> for u64 {
 }
 
 impl From<u64> for KeybdKey {
+    // https://docs.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes?redirectedfrom=MSDN
     fn from(code: u64) -> KeybdKey {
         match code {
             0x08 => BackspaceKey,
