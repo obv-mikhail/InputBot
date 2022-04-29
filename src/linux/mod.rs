@@ -16,7 +16,8 @@ use nix::{
 };
 use once_cell::sync::Lazy;
 use std::{
-    mem::MaybeUninit, os::unix::io::RawFd, path::Path, ptr::null, thread::sleep, time::Duration,
+    mem::MaybeUninit, os::unix::io::RawFd, path::Path, ptr::null, sync::Mutex, thread::sleep,
+    time::Duration,
 };
 use uinput::event::{
     controller::{Controller, Mouse},
@@ -79,10 +80,13 @@ pub fn init_device() {
 }
 
 impl KeybdKey {
+    /// Returns true if a given `KeybdKey` is currently pressed (in the down position).
     pub fn is_pressed(self) -> bool {
         *KEY_STATES.lock().unwrap().entry(self).or_insert(false)
     }
 
+    /// Presses a given `KeybdKey`. Note: this means the key will remain in the down
+    /// position. You must manually call release to create a full 'press'.
     pub fn press(self) {
         let mut device = FAKE_DEVICE.lock().unwrap();
 
@@ -90,6 +94,7 @@ impl KeybdKey {
         device.synchronize().unwrap();
     }
 
+    /// Releases a given `KeybdKey`. This means the key would be in the up position.
     pub fn release(self) {
         let mut device = FAKE_DEVICE.lock().unwrap();
 
@@ -97,6 +102,8 @@ impl KeybdKey {
         device.synchronize().unwrap();
     }
 
+    /// Returns true if a keyboard key which supports toggling (ScrollLock, NumLock,
+    /// CapsLock) is on.
     pub fn is_toggled(self) -> bool {
         if let Some(key) = match self {
             KeybdKey::ScrollLockKey => Some(4),
@@ -116,16 +123,20 @@ impl KeybdKey {
 }
 
 impl MouseButton {
+    /// Returns true if a given `MouseButton` is currently pressed (in the down position).
     pub fn is_pressed(self) -> bool {
         *BUTTON_STATES.lock().unwrap().entry(self).or_insert(false)
     }
 
+    /// Presses a given `MouseButton`. Note: this means the button will remain in the down
+    /// position. You must manually call release to create a full 'click'.
     pub fn press(self) {
         let mut device = FAKE_DEVICE.lock().unwrap();
         device.press(&Controller::Mouse(Mouse::from(self))).unwrap();
         device.synchronize().unwrap();
     }
 
+    /// Releases a given `MouseButton`. This means the button would be in the up position.
     pub fn release(self) {
         let mut device = FAKE_DEVICE.lock().unwrap();
         device
@@ -136,6 +147,7 @@ impl MouseButton {
 }
 
 impl MouseCursor {
+    /// Moves the mouse relative to its current position by a given amount of pixels.
     pub fn move_rel(x: i32, y: i32) {
         let mut device = FAKE_DEVICE.lock().unwrap();
 
@@ -148,6 +160,8 @@ impl MouseCursor {
         device.synchronize().unwrap();
     }
 
+    /// Moves the mouse to a given position based on absolute coordinates. The top left
+    /// corner of the screen is (0, 0).
     pub fn move_abs(x: i32, y: i32) {
         let mut device = FAKE_DEVICE.lock().unwrap();
 
@@ -169,6 +183,7 @@ impl MouseCursor {
 }
 
 impl MouseWheel {
+    /// Scrolls the mouse wheel vertically by a given amount.
     pub fn scroll_ver(y: i32) {
         if y < 0 {
             MouseButton::OtherButton(4).press();
@@ -178,6 +193,8 @@ impl MouseWheel {
             MouseButton::OtherButton(5).release();
         }
     }
+
+    /// Scrolls the mouse wheel horizontally by a given amount.
     pub fn scroll_hor(x: i32) {
         if x < 0 {
             MouseButton::OtherButton(6).press();
@@ -211,65 +228,62 @@ impl LibinputInterface for LibinputInterfaceRaw {
     }
 }
 
+/// Starts listening for bound input events.
 pub fn handle_input_events() {
     let mut libinput_context = Libinput::new_with_udev(LibinputInterfaceRaw);
     libinput_context
         .udev_assign_seat(&LibinputInterfaceRaw.seat())
         .unwrap();
+
     while !MOUSE_BINDS.lock().unwrap().is_empty() || !KEYBD_BINDS.lock().unwrap().is_empty() {
         libinput_context.dispatch().unwrap();
-        while let Some(event) = libinput_context.next() {
+
+        for event in libinput_context.by_ref() {
             handle_input_event(event);
         }
+
         sleep(Duration::from_millis(10));
     }
 }
 
 fn handle_input_event(event: Event) {
     match event {
-        Keyboard(keyboard_event) => {
-            match keyboard_event {
-                KeyboardEvent::Key(keyboard_key_event) => {
-                    let key = keyboard_key_event.key();
-                    if let Some(keybd_key) = scan_code_to_key(key) {
-                        if keyboard_key_event.key_state() == KeyState::Pressed {
-                            KEY_STATES.lock().unwrap().insert(keybd_key, true);
-                            if let Some(Bind::NormalBind(cb)) =
-                                KEYBD_BINDS.lock().unwrap().get(&keybd_key)
-                            {
-                                let cb = Arc::clone(cb);
-                                spawn(move || cb());
-                            };
-                        } else {
-                            KEY_STATES.lock().unwrap().insert(keybd_key, false);
-                        }
+        Keyboard(KeyboardEvent::Key(keyboard_key_event)) => {
+            let key = keyboard_key_event.key();
+            if let Some(keybd_key) = scan_code_to_key(key) {
+                if keyboard_key_event.key_state() == KeyState::Pressed {
+                    KEY_STATES.lock().unwrap().insert(keybd_key, true);
+
+                    if let Some(Bind::NormalBind(cb)) = KEYBD_BINDS.lock().unwrap().get(&keybd_key)
+                    {
+                        let cb = Arc::clone(cb);
+                        spawn(move || cb());
                     }
+                } else {
+                    KEY_STATES.lock().unwrap().insert(keybd_key, false);
                 }
-                _ => (),
             }
         }
-        Pointer(pointer_event) => {
-            if let Button(button_event) = pointer_event {
-                let button = button_event.button();
-                if let Some(mouse_button) = match button {
-                    272 => Some(MouseButton::LeftButton),
-                    273 => Some(MouseButton::RightButton),
-                    274 => Some(MouseButton::MiddleButton),
-                    275 => Some(MouseButton::X1Button),
-                    276 => Some(MouseButton::X2Button),
-                    _ => None,
-                } {
-                    if button_event.button_state() == ButtonState::Pressed {
-                        BUTTON_STATES.lock().unwrap().insert(mouse_button, true);
-                        if let Some(Bind::NormalBind(cb)) =
-                            MOUSE_BINDS.lock().unwrap().get(&mouse_button)
-                        {
-                            let cb = Arc::clone(cb);
-                            spawn(move || cb());
-                        };
-                    } else {
-                        BUTTON_STATES.lock().unwrap().insert(mouse_button, false);
-                    }
+        Pointer(Button(button_event)) => {
+            let button = button_event.button();
+            if let Some(mouse_button) = match button {
+                272 => Some(MouseButton::LeftButton),
+                273 => Some(MouseButton::RightButton),
+                274 => Some(MouseButton::MiddleButton),
+                275 => Some(MouseButton::X1Button),
+                276 => Some(MouseButton::X2Button),
+                _ => None,
+            } {
+                if button_event.button_state() == ButtonState::Pressed {
+                    BUTTON_STATES.lock().unwrap().insert(mouse_button, true);
+                    if let Some(Bind::NormalBind(cb)) =
+                        MOUSE_BINDS.lock().unwrap().get(&mouse_button)
+                    {
+                        let cb = Arc::clone(cb);
+                        spawn(move || cb());
+                    };
+                } else {
+                    BUTTON_STATES.lock().unwrap().insert(mouse_button, false);
                 }
             }
         }

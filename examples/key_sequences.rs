@@ -4,10 +4,10 @@ use inputbot::{KeySequence, KeybdKey::*};
 /// This can be used, for example, to create a macro which types a specific string.
 
 fn main() {
-    // This is not strictly neccesary, but by calling this function, you can avoid a 'startup delay'
-    // when executing your first callback. This can impact key sequences by cutting off the first
-    // few characters.
-    inputbot::init_device();
+    // If you are on Linux, you may wish to call this function first to avoid a startup delay when
+    // the fake device is created. Otherwise, your first input event - if it is a key sequence - may
+    // have missing characters.
+    //     inputbot::init_device();
 
     // Bind our Backquote key (`, ~) to a function that types out the string "Hello, world!".
     // You must remember to call the `.send()` method on the KeySequence after creating it.

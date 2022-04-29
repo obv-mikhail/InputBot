@@ -7,10 +7,6 @@ use inputbot::{KeybdKey::*, MouseCursor};
 /// which exposes your system display resolution, as well as separates different monitors.
 
 fn main() {
-    // This is not strictly neccesary, but by calling this function, you can avoid a 'startup delay'
-    // when executing your first callback.
-    inputbot::init_device();
-
     // Bind our 1 key to a function that moves the mouse absolute to your monitors. Note: if you
     // have multiple monitors, 0, 0 might be not where you're expecting. If we wanted to get the
     // absolute position of your primary (or a specific) monitor, we would need to bring in extra

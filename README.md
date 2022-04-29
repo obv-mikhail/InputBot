@@ -3,48 +3,45 @@ Cross-platform (Windows & Linux) library for simulating keyboard/mouse input eve
 
 Allows writing automation programs that collapse long action-sequences into single key-presses.
 
-## Usage sample
+## Usage
+
+```toml
+[dependencies]
+inputbot = "0.5"
+```
 
 ```rust
-use inputbot::{KeybdKey::*, MouseButton::*, *};
+use inputbot::{KeySequence, KeybdKey::*, MouseButton::*};
 use std::{thread::sleep, time::Duration};
 
 fn main() {
-    // Autorun for videogames.
-    NumLockKey.bind(|| {
-        while NumLockKey.is_toggled() {
-            LShiftKey.press();
-            WKey.press();
-            sleep(Duration::from_millis(50));
-            WKey.release();
-            LShiftKey.release();
-        }
-    });
+    // Bind the number 1 key your keyboard to a function that types 
+    // "Hello, world!" when pressed.
+    Numrow1Key.bind(|| KeySequence("Hello, world!").send());
 
-    // Rapidfire for videogames.
-    RightButton.bind(|| {
-        while RightButton.is_pressed() {
+    // Bind your caps lock key to a function that starts an autoclicker.
+    CapsLockKey.bind(move || {
+        while CapsLockKey.is_toggled() {
             LeftButton.press();
-            sleep(Duration::from_millis(50));
             LeftButton.release();
+
+            sleep(Duration::from_millis(30));
         }
     });
-
-    // Create a handler to trigger on any and all keyboard events.
-    inputbot::KeybdKey::bind_all(|evnt| {
-        println!("{:?}", evnt);
-    });
-
-    // Send a key sequence.
-    RKey.bind(|| KeySequence("Sample text").send());
-
-    // Move mouse.
-    QKey.bind(|| MouseCursor::move_rel(10, 10));
 
     // Call this to start listening for bound inputs.
-    handle_input_events();
+    inputbot::handle_input_events();
 }
 ```
+
+*NOTE: The README and examples are based off the `develop` branch of InputBot. If a feature is not working, you are probably using the version from crates.io. If you want to use the latest build, add this to your Cargo.toml:*
+
+```toml
+[dependencies]
+inputbot = { git = "https://github.com/obv-mikhail/InputBot", branch = "develop" }
+```
+
+Check out **[examples](/examples)** for comprehensive examples on how to use each feature.
 
 ## Build Dependencies
 

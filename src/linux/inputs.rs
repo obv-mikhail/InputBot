@@ -4,6 +4,7 @@ use crate::public::{
 };
 
 impl From<KeybdKey> for u64 {
+    // https://www.win.tue.nl/~aeb/linux/kbd/scancodes-1.html
     fn from(key: KeybdKey) -> u64 {
         match key {
             BackspaceKey => 0xFF08,

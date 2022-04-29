@@ -116,13 +116,15 @@ pub enum KeybdKey {
     OtherKey(u64),
 }
 
-#[derive(Debug, Eq, PartialEq, Hash, Copy, Clone)]
+#[derive(Debug, Eq, PartialEq, Hash, Copy, Clone, EnumIter)]
 pub enum MouseButton {
     LeftButton,
     MiddleButton,
     RightButton,
     X1Button,
     X2Button,
+
+    #[strum(disabled)]
     OtherButton(u32),
 }
 
@@ -190,6 +192,19 @@ impl MouseButton {
             .lock()
             .unwrap()
             .insert(self, Bind::BlockableBind(Arc::new(callback)));
+    }
+
+    pub fn bind_all<F: Fn(MouseButton) + Send + Sync + Copy + 'static>(callback: F) {
+        for btn in MouseButton::iter() {
+            let fire = move || {
+                callback(btn);
+            };
+
+            MOUSE_BINDS
+                .lock()
+                .unwrap()
+                .insert(btn, Bind::NormalBind(Arc::new(fire)));
+        }
     }
 
     pub fn unbind(self) {
