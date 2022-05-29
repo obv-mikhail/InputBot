@@ -154,8 +154,9 @@ impl KeybdKey {
             .insert(self, Bind::BlockableBind(Arc::new(callback)));
     }
 
-    pub fn bind_all<F: Fn(KeybdKey) + Send + Sync + Copy + 'static>(callback: F) {
+    pub fn bind_all<F: Fn(KeybdKey) + Send + Sync + Clone + 'static>(callback: F) {
         for key in KeybdKey::iter() {
+            let callback = callback.clone();
             let fire = move || {
                 callback(key);
             };
