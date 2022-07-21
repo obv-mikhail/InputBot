@@ -70,12 +70,12 @@ impl MouseButton {
 
 impl MouseCursor {
     pub fn pos() -> (i32, i32) {
-        unsafe {
+        
             let mut point = MaybeUninit::uninit();
-            GetCursorPos(point.as_mut_ptr());
-            let point = point.assume_init();
+            unsafe { GetCursorPos(point.as_mut_ptr()) };
+            let point = unsafe { point.assume_init() };
             (point.x, point.y)
-        }
+        
     }
 
     /// Moves the mouse relative to its current position by a given amount of pixels.
