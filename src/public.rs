@@ -195,8 +195,9 @@ impl MouseButton {
             .insert(self, Bind::BlockableBind(Arc::new(callback)));
     }
 
-    pub fn bind_all<F: Fn(MouseButton) + Send + Sync + Copy + 'static>(callback: F) {
+    pub fn bind_all<F: Fn(MouseButton) + Send + Sync + Clone + 'static>(callback: F) {
         for btn in MouseButton::iter() {
+            let callback = callback.clone();
             let fire = move || {
                 callback(btn);
             };
