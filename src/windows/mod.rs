@@ -208,34 +208,52 @@ fn unset_hook(hook_ptr: &AtomicPtr<HHOOK__>) {
 }
 
 fn send_mouse_input(flags: u32, data: u32, dx: i32, dy: i32) {
+    let mouse: MOUSEINPUT = unsafe {
+        MOUSEINPUT {
+            dx,
+            dy,
+            mouseData: data,
+            dwFlags: flags,
+            time: 0,
+            dwExtraInfo: 0,
+        }
+    };
+
+    let mut input_u: INPUT_u = unsafe { std::mem::zeroed() };
+
+    unsafe {
+        *input_u.mi_mut() = mouse;
+    }
+
     let mut input = INPUT {
         type_: INPUT_MOUSE,
-        u: unsafe {
-            transmute_copy(&MOUSEINPUT {
-                dx,
-                dy,
-                mouseData: data,
-                dwFlags: flags,
-                time: 0,
-                dwExtraInfo: 0,
-            })
-        },
+        u: input_u,
     };
     unsafe { SendInput(1, &mut input as LPINPUT, size_of::<INPUT>() as c_int) };
 }
 
 fn send_keybd_input(flags: u32, key_code: KeybdKey) {
+    let keybd: KEYBDINPUT = unsafe {
+        KEYBDINPUT {
+            wVk: 0,
+            wScan: MapVirtualKeyW(u64::from(key_code) as u32, 0) as u16,
+            dwFlags: flags,
+            time: 0,
+            dwExtraInfo: 0,
+        }
+    };
+
+    // We need an "empty" winapi struct to union-ize
+    let mut input_u: INPUT_u = unsafe { std::mem::zeroed() };
+
+    unsafe {
+        *input_u.ki_mut() = keybd;
+    }
+
     let mut input = INPUT {
         type_: INPUT_KEYBOARD,
-        u: unsafe {
-            transmute_copy(&KEYBDINPUT {
-                wVk: 0,
-                wScan: MapVirtualKeyW(u64::from(key_code) as u32, 0) as u16,
-                dwFlags: flags,
-                time: 0,
-                dwExtraInfo: 0,
-            })
-        },
+        u: input_u,
     };
+
     unsafe { SendInput(1, &mut input as LPINPUT, size_of::<INPUT>() as c_int) };
 }
