@@ -7,7 +7,7 @@ Allows writing automation programs that collapse long action-sequences into sing
 
 ```toml
 [dependencies]
-inputbot = "0.5"
+inputbot = "0.6"
 ```
 
 ```rust

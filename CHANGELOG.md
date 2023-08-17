@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.6.0
+
+### Added
+
+- Many missing keys
+- Check if ScrollLock is toggled
+- `bind_all`
+
+## Changed
+
+- `get_keybd_key` is now public
+
+### Fixed
+
+- Mouse cursor move on Linux
+- Use Wayland for mouse press and release on Linux
+- Support checks for whether is pressed on Linux with Wayland
+- Synchronize device after use
+- Improved examples
+- Handling of Alt keys
+- Updated dependencies
+- Improved comments
+- Reduced unsafe usage
+- Various refactorings
+
 ## 0.5.0
 
 ### Added
