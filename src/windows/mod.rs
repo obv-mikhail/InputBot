@@ -1,7 +1,7 @@
 use crate::{common::*, public::*};
 use once_cell::sync::Lazy;
 use std::{
-    mem::{size_of, transmute_copy, MaybeUninit},
+    mem::{size_of, MaybeUninit},
     ptr::null_mut,
     sync::atomic::AtomicPtr,
 };
@@ -70,12 +70,10 @@ impl MouseButton {
 
 impl MouseCursor {
     pub fn pos() -> (i32, i32) {
-        
-            let mut point = MaybeUninit::uninit();
-            unsafe { GetCursorPos(point.as_mut_ptr()) };
-            let point = unsafe { point.assume_init() };
-            (point.x, point.y)
-        
+        let mut point = MaybeUninit::uninit();
+        unsafe { GetCursorPos(point.as_mut_ptr()) };
+        let point = unsafe { point.assume_init() };
+        (point.x, point.y)
     }
 
     /// Moves the mouse relative to its current position by a given amount of pixels.
@@ -119,7 +117,7 @@ pub fn handle_input_events() {
 
 unsafe extern "system" fn keybd_proc(code: c_int, w_param: WPARAM, l_param: LPARAM) -> LRESULT {
     if KEYBD_BINDS.lock().unwrap().is_empty() {
-        unset_hook(&*KEYBD_HHOOK);
+        unset_hook(&KEYBD_HHOOK);
     } else if w_param as u32 == WM_KEYDOWN || w_param as u32 == WM_SYSKEYDOWN {
         if let Some(bind) = KEYBD_BINDS
             .lock()
@@ -151,7 +149,7 @@ unsafe extern "system" fn keybd_proc(code: c_int, w_param: WPARAM, l_param: LPAR
 
 unsafe extern "system" fn mouse_proc(code: c_int, w_param: WPARAM, l_param: LPARAM) -> LRESULT {
     if MOUSE_BINDS.lock().unwrap().is_empty() {
-        unset_hook(&*MOUSE_HHOOK);
+        unset_hook(&MOUSE_HHOOK);
     } else if let Some(event) = match w_param as u32 {
         WM_LBUTTONDOWN => Some(MouseButton::LeftButton),
         WM_RBUTTONDOWN => Some(MouseButton::RightButton),
@@ -208,15 +206,13 @@ fn unset_hook(hook_ptr: &AtomicPtr<HHOOK__>) {
 }
 
 fn send_mouse_input(flags: u32, data: u32, dx: i32, dy: i32) {
-    let mouse: MOUSEINPUT = unsafe {
-        MOUSEINPUT {
-            dx,
-            dy,
-            mouseData: data,
-            dwFlags: flags,
-            time: 0,
-            dwExtraInfo: 0,
-        }
+    let mouse: MOUSEINPUT = MOUSEINPUT {
+        dx,
+        dy,
+        mouseData: data,
+        dwFlags: flags,
+        time: 0,
+        dwExtraInfo: 0,
     };
 
     let mut input_u: INPUT_u = unsafe { std::mem::zeroed() };
