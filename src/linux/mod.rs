@@ -270,7 +270,7 @@ fn handle_input_event(event: Event) {
                 if keyboard_key_event.key_state() == KeyState::Pressed {
                     KEY_STATES.lock().unwrap().insert(keybd_key, true);
 
-                    if let Some(Bind::NormalBind(cb)) = KEYBD_BINDS.lock().unwrap().get(&keybd_key)
+                    if let Some(Bind::Normal(cb)) = KEYBD_BINDS.lock().unwrap().get(&keybd_key)
                     {
                         let cb = Arc::clone(cb);
                         spawn(move || cb());
@@ -292,7 +292,7 @@ fn handle_input_event(event: Event) {
             } {
                 if button_event.button_state() == ButtonState::Pressed {
                     BUTTON_STATES.lock().unwrap().insert(mouse_button, true);
-                    if let Some(Bind::NormalBind(cb)) =
+                    if let Some(Bind::Normal(cb)) =
                         MOUSE_BINDS.lock().unwrap().get(&mouse_button)
                     {
                         let cb = Arc::clone(cb);
