@@ -194,6 +194,149 @@ impl KeybdKey {
     }
 }
 
+impl std::fmt::Display for KeybdKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                KeybdKey::BackspaceKey => "Backspace",
+                KeybdKey::TabKey => "Tab",
+                KeybdKey::EnterKey => "Enter",
+                KeybdKey::EscapeKey => "Escape",
+                KeybdKey::SpaceKey => "Space",
+                KeybdKey::PageUpKey => "PageUp",
+                KeybdKey::PageDownKey => "PageDown",
+                KeybdKey::EndKey => "End",
+                KeybdKey::HomeKey => "Home",
+                KeybdKey::LeftKey => "Left",
+                KeybdKey::UpKey => "Up",
+                KeybdKey::RightKey => "Right",
+                KeybdKey::DownKey => "Down",
+                KeybdKey::InsertKey => "Insert",
+                KeybdKey::DeleteKey => "Delete",
+                KeybdKey::Numrow0Key => "0",
+                KeybdKey::Numrow1Key => "1",
+                KeybdKey::Numrow2Key => "2",
+                KeybdKey::Numrow3Key => "3",
+                KeybdKey::Numrow4Key => "4",
+                KeybdKey::Numrow5Key => "5",
+                KeybdKey::Numrow6Key => "6",
+                KeybdKey::Numrow7Key => "7",
+                KeybdKey::Numrow8Key => "8",
+                KeybdKey::Numrow9Key => "9",
+                KeybdKey::AKey => "a",
+                KeybdKey::BKey => "b",
+                KeybdKey::CKey => "c",
+                KeybdKey::DKey => "d",
+                KeybdKey::EKey => "e",
+                KeybdKey::FKey => "f",
+                KeybdKey::GKey => "g",
+                KeybdKey::HKey => "h",
+                KeybdKey::IKey => "i",
+                KeybdKey::JKey => "j",
+                KeybdKey::KKey => "k",
+                KeybdKey::LKey => "l",
+                KeybdKey::MKey => "m",
+                KeybdKey::NKey => "n",
+                KeybdKey::OKey => "o",
+                KeybdKey::PKey => "p",
+                KeybdKey::QKey => "q",
+                KeybdKey::RKey => "r",
+                KeybdKey::SKey => "s",
+                KeybdKey::TKey => "t",
+                KeybdKey::UKey => "u",
+                KeybdKey::VKey => "v",
+                KeybdKey::WKey => "w",
+                KeybdKey::XKey => "x",
+                KeybdKey::YKey => "y",
+                KeybdKey::ZKey => "z",
+                KeybdKey::LSuper =>
+                    if cfg!(target_os = "windows") {
+                        "Left Windows"
+                    } else if cfg!(target_os = "macos") {
+                        "Left Command"
+                    } else {
+                        "Left Super"
+                    },
+                KeybdKey::RSuper =>
+                    if cfg!(target_os = "windows") {
+                        "Right Windows"
+                    } else if cfg!(target_os = "macos") {
+                        "Right Command"
+                    } else {
+                        "Right Super"
+                    },
+                KeybdKey::Numpad0Key => "Number Pad 0",
+                KeybdKey::Numpad1Key => "Number Pad 1",
+                KeybdKey::Numpad2Key => "Number Pad 2",
+                KeybdKey::Numpad3Key => "Number Pad 3",
+                KeybdKey::Numpad4Key => "Number Pad 4",
+                KeybdKey::Numpad5Key => "Number Pad 5",
+                KeybdKey::Numpad6Key => "Number Pad 6",
+                KeybdKey::Numpad7Key => "Number Pad 7",
+                KeybdKey::Numpad8Key => "Number Pad 8",
+                KeybdKey::Numpad9Key => "Number Pad 9",
+                KeybdKey::F1Key => "F1",
+                KeybdKey::F2Key => "F2",
+                KeybdKey::F3Key => "F3",
+                KeybdKey::F4Key => "F4",
+                KeybdKey::F5Key => "F5",
+                KeybdKey::F6Key => "F6",
+                KeybdKey::F7Key => "F7",
+                KeybdKey::F8Key => "F8",
+                KeybdKey::F9Key => "F9",
+                KeybdKey::F10Key => "F10",
+                KeybdKey::F11Key => "F11",
+                KeybdKey::F12Key => "F12",
+                KeybdKey::F13Key => "F13",
+                KeybdKey::F14Key => "F14",
+                KeybdKey::F15Key => "F15",
+                KeybdKey::F16Key => "F16",
+                KeybdKey::F17Key => "F17",
+                KeybdKey::F18Key => "F18",
+                KeybdKey::F19Key => "F19",
+                KeybdKey::F20Key => "F20",
+                KeybdKey::F21Key => "F21",
+                KeybdKey::F22Key => "F22",
+                KeybdKey::F23Key => "F23",
+                KeybdKey::F24Key => "F24",
+                KeybdKey::NumLockKey => "Number Lock",
+                KeybdKey::ScrollLockKey => "Scroll Lock",
+                KeybdKey::CapsLockKey => "Caps Lock",
+                KeybdKey::LShiftKey => "Left Shift",
+                KeybdKey::RShiftKey => "Right Shift",
+                KeybdKey::LControlKey => "Left Control",
+                KeybdKey::RControlKey => "Right Control",
+                KeybdKey::LAltKey => "Left Alt",
+                KeybdKey::RAltKey => "Right Alt",
+                KeybdKey::BrowserBackKey => "Back",
+                KeybdKey::BrowserForwardKey => "Forward",
+                KeybdKey::BrowserRefreshKey => "Refresh",
+                KeybdKey::VolumeMuteKey => "Volume Mute",
+                KeybdKey::VolumeDownKey => "Volume Down",
+                KeybdKey::VolumeUpKey => "Volume Up",
+                KeybdKey::MediaNextTrackKey => "Media Next",
+                KeybdKey::MediaPrevTrackKey => "Media Previous",
+                KeybdKey::MediaStopKey => "Media Stop",
+                KeybdKey::MediaPlayPauseKey => "Media Play",
+                KeybdKey::BackquoteKey => "Backquote",
+                KeybdKey::SlashKey => "Slash",
+                KeybdKey::BackslashKey => "Backslash",
+                KeybdKey::CommaKey => "Comma",
+                KeybdKey::PeriodKey => "Period",
+                KeybdKey::MinusKey => "Minus",
+                KeybdKey::QuoteKey => "QuoteKey",
+                KeybdKey::SemicolonKey => "Semicolon",
+                KeybdKey::LBracketKey => "Left Bracket",
+                KeybdKey::RBracketKey => "Right Bracket",
+                KeybdKey::EqualKey => "Equal",
+                KeybdKey::OtherKey(code) => return write!(f, "{code} Key"),
+            }
+        )
+    }
+}
+
 impl MouseButton {
     pub fn bind<F: Fn() + Send + Sync + 'static>(self, callback: F) {
         MOUSE_BINDS
