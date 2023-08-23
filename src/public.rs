@@ -378,6 +378,23 @@ impl MouseButton {
     }
 }
 
+impl std::fmt::Display for MouseButton {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                MouseButton::LeftButton => "Left Click",
+                MouseButton::MiddleButton => "Middle Click",
+                MouseButton::RightButton => "Right Click",
+                MouseButton::X1Button => "Mouse Backward",
+                MouseButton::X2Button => "Mouse Forward",
+                MouseButton::OtherButton(code) => return write!(f, "{code} Click"),
+            }
+        )
+    }
+}
+
 pub fn from_keybd_key(k: KeybdKey) -> Option<char> {
     match k {
         KeybdKey::AKey => Some('a'),
