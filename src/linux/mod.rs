@@ -16,7 +16,13 @@ use nix::{
 };
 use once_cell::sync::Lazy;
 use std::{
-    mem::MaybeUninit, os::unix::io::RawFd, path::Path, ptr::null, sync::Mutex, thread::sleep,
+    mem::MaybeUninit,
+    os::unix::io::RawFd,
+    path::Path,
+    ptr::null,
+    sync::atomic::{AtomicBool, Ordering},
+    sync::Mutex,
+    thread::sleep,
     time::Duration,
 };
 use uinput::event::{
@@ -33,11 +39,8 @@ type KeyStatesMap = HashMap<KeybdKey, bool>;
 
 static BUTTON_STATES: Lazy<Mutex<ButtonStatesMap>> =
     Lazy::new(|| Mutex::new(ButtonStatesMap::new()));
+static END_HANDLE_EVENTS: AtomicBool = AtomicBool::new(false);
 static KEY_STATES: Lazy<Mutex<KeyStatesMap>> = Lazy::new(|| Mutex::new(KeyStatesMap::new()));
-static SEND_DISPLAY: Lazy<AtomicPtr<Display>> = Lazy::new(|| {
-    unsafe { XInitThreads() };
-    AtomicPtr::new(unsafe { XOpenDisplay(null()) })
-});
 static FAKE_DEVICE: Lazy<Mutex<uinput::Device>> = Lazy::new(|| {
     Mutex::new(
         uinput::default()
@@ -69,6 +72,10 @@ static FAKE_DEVICE: Lazy<Mutex<uinput::Device>> = Lazy::new(|| {
             .create()
             .unwrap(),
     )
+});
+static SEND_DISPLAY: Lazy<AtomicPtr<Display>> = Lazy::new(|| {
+    unsafe { XInitThreads() };
+    AtomicPtr::new(unsafe { XOpenDisplay(null()) })
 });
 
 /// Requests the fake device to be generated.
@@ -236,6 +243,9 @@ pub fn handle_input_events() {
         .unwrap();
 
     while !MOUSE_BINDS.lock().unwrap().is_empty() || !KEYBD_BINDS.lock().unwrap().is_empty() {
+        if END_HANDLE_EVENTS.load(Ordering::Relaxed) {
+            break;
+        }
         libinput_context.dispatch().unwrap();
 
         for event in libinput_context.by_ref() {
@@ -244,6 +254,12 @@ pub fn handle_input_events() {
 
         sleep(Duration::from_millis(10));
     }
+
+    END_HANDLE_EVENTS.store(false, Ordering::Relaxed);
+}
+
+pub fn stop_handling_input_events() {
+    END_HANDLE_EVENTS.store(true, Ordering::Relaxed);
 }
 
 fn handle_input_event(event: Event) {
