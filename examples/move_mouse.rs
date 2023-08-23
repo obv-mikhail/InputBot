@@ -13,7 +13,7 @@ fn main() {
     // libraries.
     Numrow1Key.bind(|| {
         for x in 0..=600 {
-            MouseCursor::move_abs(x as i32, 300);
+            MouseCursor::move_abs(x, 300);
             sleep(Duration::from_millis(1));
         }
     });
