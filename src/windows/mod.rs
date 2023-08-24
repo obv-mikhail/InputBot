@@ -127,16 +127,16 @@ unsafe extern "system" fn keybd_proc(code: c_int, w_param: WPARAM, l_param: LPAR
             )))
         {
             match bind {
-                Bind::NormalBind(cb) => {
+                Bind::Normal(cb) => {
                     let cb = Arc::clone(cb);
                     spawn(move || cb());
                 }
-                Bind::BlockBind(cb) => {
+                Bind::Block(cb) => {
                     let cb = Arc::clone(cb);
                     spawn(move || cb());
                     return 1;
                 }
-                Bind::BlockableBind(cb) => {
+                Bind::Blockable(cb) => {
                     if let BlockInput::Block = cb() {
                         return 1;
                     }
@@ -167,16 +167,16 @@ unsafe extern "system" fn mouse_proc(code: c_int, w_param: WPARAM, l_param: LPAR
     } {
         if let Some(bind) = MOUSE_BINDS.lock().unwrap().get_mut(&event) {
             match bind {
-                Bind::NormalBind(cb) => {
+                Bind::Normal(cb) => {
                     let cb = Arc::clone(cb);
                     spawn(move || cb());
                 }
-                Bind::BlockBind(cb) => {
+                Bind::Block(cb) => {
                     let cb = Arc::clone(cb);
                     spawn(move || cb());
                     return 1;
                 }
-                Bind::BlockableBind(cb) => {
+                Bind::Blockable(cb) => {
                     if let BlockInput::Block = cb() {
                         return 1;
                     }
