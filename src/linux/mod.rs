@@ -39,7 +39,7 @@ type KeyStatesMap = HashMap<KeybdKey, bool>;
 
 static BUTTON_STATES: Lazy<Mutex<ButtonStatesMap>> =
     Lazy::new(|| Mutex::new(ButtonStatesMap::new()));
-static END_HANDLE_EVENTS: AtomicBool = AtomicBool::new(false);
+static HANDLE_EVENTS: AtomicBool = AtomicBool::new(true);
 static KEY_STATES: Lazy<Mutex<KeyStatesMap>> = Lazy::new(|| Mutex::new(KeyStatesMap::new()));
 static FAKE_DEVICE: Lazy<Mutex<uinput::Device>> = Lazy::new(|| {
     Mutex::new(
@@ -243,7 +243,7 @@ pub fn handle_input_events() {
         .unwrap();
 
     while !MOUSE_BINDS.lock().unwrap().is_empty() || !KEYBD_BINDS.lock().unwrap().is_empty() {
-        if END_HANDLE_EVENTS.load(Ordering::Relaxed) {
+        if !HANDLE_EVENTS.load(Ordering::Relaxed) {
             break;
         }
         libinput_context.dispatch().unwrap();
@@ -255,11 +255,12 @@ pub fn handle_input_events() {
         sleep(Duration::from_millis(10));
     }
 
-    END_HANDLE_EVENTS.store(false, Ordering::Relaxed);
+    HANDLE_EVENTS.store(true, Ordering::Relaxed);
 }
 
+/// Stops `handle_input_events()` using a thread safe AtomicBool
 pub fn stop_handling_input_events() {
-    END_HANDLE_EVENTS.store(true, Ordering::Relaxed);
+    HANDLE_EVENTS.store(false, Ordering::Relaxed);
 }
 
 fn handle_input_event(event: Event) {
