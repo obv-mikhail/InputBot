@@ -44,15 +44,16 @@ inputbot = { git = "https://github.com/obv-mikhail/InputBot", branch = "develop"
 Check out **[examples](/examples)** for comprehensive examples on how to use each feature.
 
 ## Build Dependencies
+**Note:** libinput requires InputBot to be run with sudo on Linux - `sudo ./target/debug/<program name>`.
 
-### Debian or Ubuntu based distros
+### Debian/Ubuntu based distros
 
 * **libx11-dev**
 * **libxtst-dev**
 * **libudev-dev**
 * **libinput-dev**
 
-**Note:** libinput requires InputBot to be run with sudo on Linux - `sudo ./target/debug/<program name>`.
+### [NixOs/Nix](flake.nix)
 
 ## Examples
 

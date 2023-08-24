@@ -16,7 +16,13 @@ use nix::{
 };
 use once_cell::sync::Lazy;
 use std::{
-    mem::MaybeUninit, os::unix::io::RawFd, path::Path, ptr::null, sync::Mutex, thread::sleep,
+    mem::MaybeUninit,
+    os::unix::io::RawFd,
+    path::Path,
+    ptr::null,
+    sync::atomic::{AtomicBool, Ordering},
+    sync::Mutex,
+    thread::sleep,
     time::Duration,
 };
 use uinput::event::{
@@ -33,11 +39,8 @@ type KeyStatesMap = HashMap<KeybdKey, bool>;
 
 static BUTTON_STATES: Lazy<Mutex<ButtonStatesMap>> =
     Lazy::new(|| Mutex::new(ButtonStatesMap::new()));
+static HANDLE_EVENTS: AtomicBool = AtomicBool::new(true);
 static KEY_STATES: Lazy<Mutex<KeyStatesMap>> = Lazy::new(|| Mutex::new(KeyStatesMap::new()));
-static SEND_DISPLAY: Lazy<AtomicPtr<Display>> = Lazy::new(|| {
-    unsafe { XInitThreads() };
-    AtomicPtr::new(unsafe { XOpenDisplay(null()) })
-});
 static FAKE_DEVICE: Lazy<Mutex<uinput::Device>> = Lazy::new(|| {
     Mutex::new(
         uinput::default()
@@ -69,6 +72,10 @@ static FAKE_DEVICE: Lazy<Mutex<uinput::Device>> = Lazy::new(|| {
             .create()
             .unwrap(),
     )
+});
+static SEND_DISPLAY: Lazy<AtomicPtr<Display>> = Lazy::new(|| {
+    unsafe { XInitThreads() };
+    AtomicPtr::new(unsafe { XOpenDisplay(null()) })
 });
 
 /// Requests the fake device to be generated.
@@ -236,6 +243,9 @@ pub fn handle_input_events() {
         .unwrap();
 
     while !MOUSE_BINDS.lock().unwrap().is_empty() || !KEYBD_BINDS.lock().unwrap().is_empty() {
+        if !HANDLE_EVENTS.load(Ordering::Relaxed) {
+            break;
+        }
         libinput_context.dispatch().unwrap();
 
         for event in libinput_context.by_ref() {
@@ -244,6 +254,13 @@ pub fn handle_input_events() {
 
         sleep(Duration::from_millis(10));
     }
+
+    HANDLE_EVENTS.store(true, Ordering::Relaxed);
+}
+
+/// Stops `handle_input_events()` using a thread safe AtomicBool
+pub fn stop_handling_input_events() {
+    HANDLE_EVENTS.store(false, Ordering::Relaxed);
 }
 
 fn handle_input_event(event: Event) {
@@ -254,7 +271,7 @@ fn handle_input_event(event: Event) {
                 if keyboard_key_event.key_state() == KeyState::Pressed {
                     KEY_STATES.lock().unwrap().insert(keybd_key, true);
 
-                    if let Some(Bind::NormalBind(cb)) = KEYBD_BINDS.lock().unwrap().get(&keybd_key)
+                    if let Some(Bind::Normal(cb)) = KEYBD_BINDS.lock().unwrap().get(&keybd_key)
                     {
                         let cb = Arc::clone(cb);
                         spawn(move || cb());
@@ -276,7 +293,7 @@ fn handle_input_event(event: Event) {
             } {
                 if button_event.button_state() == ButtonState::Pressed {
                     BUTTON_STATES.lock().unwrap().insert(mouse_button, true);
-                    if let Some(Bind::NormalBind(cb)) =
+                    if let Some(Bind::Normal(cb)) =
                         MOUSE_BINDS.lock().unwrap().get(&mouse_button)
                     {
                         let cb = Arc::clone(cb);

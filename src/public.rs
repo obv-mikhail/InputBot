@@ -158,21 +158,21 @@ impl KeybdKey {
         KEYBD_BINDS
             .lock()
             .unwrap()
-            .insert(self, Bind::NormalBind(Arc::new(callback)));
+            .insert(self, Bind::Normal(Arc::new(callback)));
     }
 
     pub fn block_bind<F: Fn() + Send + Sync + 'static>(self, callback: F) {
         KEYBD_BINDS
             .lock()
             .unwrap()
-            .insert(self, Bind::BlockBind(Arc::new(callback)));
+            .insert(self, Bind::Block(Arc::new(callback)));
     }
 
     pub fn blockable_bind<F: Fn() -> BlockInput + Send + Sync + 'static>(self, callback: F) {
         KEYBD_BINDS
             .lock()
             .unwrap()
-            .insert(self, Bind::BlockableBind(Arc::new(callback)));
+            .insert(self, Bind::Blockable(Arc::new(callback)));
     }
 
     pub fn bind_all<F: Fn(KeybdKey) + Send + Sync + Clone + 'static>(callback: F) {
@@ -185,7 +185,7 @@ impl KeybdKey {
             KEYBD_BINDS
                 .lock()
                 .unwrap()
-                .insert(key, Bind::NormalBind(Arc::new(fire)));
+                .insert(key, Bind::Normal(Arc::new(fire)));
         }
     }
 
@@ -342,21 +342,21 @@ impl MouseButton {
         MOUSE_BINDS
             .lock()
             .unwrap()
-            .insert(self, Bind::NormalBind(Arc::new(callback)));
+            .insert(self, Bind::Normal(Arc::new(callback)));
     }
 
     pub fn block_bind<F: Fn() + Send + Sync + 'static>(self, callback: F) {
         MOUSE_BINDS
             .lock()
             .unwrap()
-            .insert(self, Bind::BlockBind(Arc::new(callback)));
+            .insert(self, Bind::Block(Arc::new(callback)));
     }
 
     pub fn blockable_bind<F: Fn() -> BlockInput + Send + Sync + 'static>(self, callback: F) {
         MOUSE_BINDS
             .lock()
             .unwrap()
-            .insert(self, Bind::BlockableBind(Arc::new(callback)));
+            .insert(self, Bind::Blockable(Arc::new(callback)));
     }
 
     pub fn bind_all<F: Fn(MouseButton) + Send + Sync + Clone + 'static>(callback: F) {
@@ -369,7 +369,7 @@ impl MouseButton {
             MOUSE_BINDS
                 .lock()
                 .unwrap()
-                .insert(btn, Bind::NormalBind(Arc::new(fire)));
+                .insert(btn, Bind::Normal(Arc::new(fire)));
         }
     }
 
@@ -511,9 +511,9 @@ pub fn get_keybd_key(c: char) -> Option<KeybdKey> {
     }
 }
 
-pub struct KeySequence(pub &'static str);
+pub struct KeySequence<'a>(pub &'a str);
 
-impl KeySequence {
+impl KeySequence<'_> {
     pub fn send(&self) {
         for c in self.0.chars() {
             let mut uppercase = false;
