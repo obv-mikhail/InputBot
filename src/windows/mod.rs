@@ -1,20 +1,38 @@
 use crate::{common::*, public::*};
 use once_cell::sync::Lazy;
 use std::{
+    ffi::{c_int, c_ulong, c_ushort},
     mem::{size_of, MaybeUninit},
     ptr::null_mut,
     sync::atomic::AtomicPtr,
 };
-use winapi::{
-    ctypes::*,
-    shared::{minwindef::*, windef::*},
-    um::winuser::*,
+use windows::Win32::{
+    Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM},
+    UI::{
+        Input::KeyboardAndMouse::{
+            GetAsyncKeyState, GetKeyState, MapVirtualKeyW, SendInput, INPUT, INPUT_0,
+            INPUT_KEYBOARD, INPUT_MOUSE, KEYBDINPUT, KEYBD_EVENT_FLAGS, KEYEVENTF_KEYUP,
+            KEYEVENTF_SCANCODE, MAP_VIRTUAL_KEY_TYPE, MOUSEEVENTF_HWHEEL, MOUSEEVENTF_LEFTDOWN,
+            MOUSEEVENTF_LEFTUP, MOUSEEVENTF_MIDDLEDOWN, MOUSEEVENTF_MIDDLEUP,
+            MOUSEEVENTF_RIGHTDOWN, MOUSEEVENTF_RIGHTUP, MOUSEEVENTF_WHEEL, MOUSEINPUT,
+            MOUSE_EVENT_FLAGS, VIRTUAL_KEY,
+        },
+        WindowsAndMessaging::{
+            CallNextHookEx, GetCursorPos, GetMessageW, SetCursorPos, SetWindowsHookExW,
+            UnhookWindowsHookEx, HHOOK, KBDLLHOOKSTRUCT, MSG, MSLLHOOKSTRUCT, WH_KEYBOARD_LL,
+            WH_MOUSE_LL, WINDOWS_HOOK_ID, WM_KEYDOWN, WM_LBUTTONDOWN, WM_MBUTTONDOWN,
+            WM_RBUTTONDOWN, WM_SYSKEYDOWN, WM_XBUTTONDOWN, XBUTTON1, XBUTTON2,
+        },
+    },
 };
 
 mod inputs;
 
-static KEYBD_HHOOK: Lazy<AtomicPtr<HHOOK__>> = Lazy::new(AtomicPtr::default);
-static MOUSE_HHOOK: Lazy<AtomicPtr<HHOOK__>> = Lazy::new(AtomicPtr::default);
+// Null HHOOK for functions where it is ignored
+const NULL_HHOOK: HHOOK = HHOOK(0);
+
+static KEYBD_HHOOK: Lazy<AtomicPtr<HHOOK>> = Lazy::new(AtomicPtr::default);
+static MOUSE_HHOOK: Lazy<AtomicPtr<HHOOK>> = Lazy::new(AtomicPtr::default);
 
 impl KeybdKey {
     /// Returns true if a given `KeybdKey` is currently pressed (in the down position).
@@ -71,7 +89,7 @@ impl MouseButton {
 impl MouseCursor {
     pub fn pos() -> (i32, i32) {
         let mut point = MaybeUninit::uninit();
-        unsafe { GetCursorPos(point.as_mut_ptr()) };
+        unsafe { GetCursorPos(point.as_mut_ptr()).unwrap() };
         let point = unsafe { point.assume_init() };
         (point.x, point.y)
     }
@@ -86,7 +104,7 @@ impl MouseCursor {
     /// corner of the screen is (0, 0).
     pub fn move_abs(x: i32, y: i32) {
         unsafe {
-            SetCursorPos(x, y);
+            SetCursorPos(x, y).unwrap();
         }
     }
 }
@@ -94,36 +112,36 @@ impl MouseCursor {
 impl MouseWheel {
     /// Scrolls the mouse wheel vertically by a given amount.
     pub fn scroll_ver(dwheel: i32) {
-        send_mouse_input(MOUSEEVENTF_WHEEL, (dwheel * 120) as u32, 0, 0);
+        send_mouse_input(MOUSEEVENTF_WHEEL, dwheel * 120, 0, 0);
     }
 
     /// Scrolls the mouse wheel horizontally by a given amount.
     pub fn scroll_hor(dwheel: i32) {
-        send_mouse_input(MOUSEEVENTF_HWHEEL, (dwheel * 120) as u32, 0, 0);
+        send_mouse_input(MOUSEEVENTF_HWHEEL, dwheel * 120, 0, 0);
     }
 }
 
 /// Starts listening for bound input events.
 pub fn handle_input_events() {
     if !MOUSE_BINDS.lock().unwrap().is_empty() {
-        set_hook(WH_MOUSE_LL, &*MOUSE_HHOOK, mouse_proc);
+        set_hook(WH_MOUSE_LL, &MOUSE_HHOOK, mouse_proc);
     };
     if !KEYBD_BINDS.lock().unwrap().is_empty() {
-        set_hook(WH_KEYBOARD_LL, &*KEYBD_HHOOK, keybd_proc);
+        set_hook(WH_KEYBOARD_LL, &KEYBD_HHOOK, keybd_proc);
     };
     let mut msg: MSG = unsafe { MaybeUninit::zeroed().assume_init() };
-    unsafe { GetMessageW(&mut msg, 0 as HWND, 0, 0) };
+    unsafe { GetMessageW(&mut msg, HWND(0), 0, 0) };
 }
 
 unsafe extern "system" fn keybd_proc(code: c_int, w_param: WPARAM, l_param: LPARAM) -> LRESULT {
     if KEYBD_BINDS.lock().unwrap().is_empty() {
         unset_hook(&KEYBD_HHOOK);
-    } else if w_param as u32 == WM_KEYDOWN || w_param as u32 == WM_SYSKEYDOWN {
+    } else if w_param.0 as u32 == WM_KEYDOWN || w_param.0 as u32 == WM_SYSKEYDOWN {
         if let Some(bind) = KEYBD_BINDS
             .lock()
             .unwrap()
             .get_mut(&KeybdKey::from(u64::from(
-                (*(l_param as *const KBDLLHOOKSTRUCT)).vkCode,
+                (*(l_param.0 as *const KBDLLHOOKSTRUCT)).vkCode,
             )))
         {
             match bind {
@@ -134,28 +152,36 @@ unsafe extern "system" fn keybd_proc(code: c_int, w_param: WPARAM, l_param: LPAR
                 Bind::Block(cb) => {
                     let cb = Arc::clone(cb);
                     spawn(move || cb());
-                    return 1;
+                    return LRESULT(1);
                 }
                 Bind::Blockable(cb) => {
                     if let BlockInput::Block = cb() {
-                        return 1;
+                        return LRESULT(1);
                     }
                 }
             }
         }
     }
-    CallNextHookEx(null_mut(), code, w_param, l_param)
+    CallNextHookEx(NULL_HHOOK, code, w_param, l_param)
+}
+
+// Replacement for missing conversions in windows crate
+type DWORD = c_ulong;
+type WORD = c_ushort;
+
+fn HIWORD(l: DWORD) -> WORD {
+    ((l >> 16) & 0xffff) as WORD
 }
 
 unsafe extern "system" fn mouse_proc(code: c_int, w_param: WPARAM, l_param: LPARAM) -> LRESULT {
     if MOUSE_BINDS.lock().unwrap().is_empty() {
         unset_hook(&MOUSE_HHOOK);
-    } else if let Some(event) = match w_param as u32 {
+    } else if let Some(event) = match w_param.0 as u32 {
         WM_LBUTTONDOWN => Some(MouseButton::LeftButton),
         WM_RBUTTONDOWN => Some(MouseButton::RightButton),
         WM_MBUTTONDOWN => Some(MouseButton::MiddleButton),
         WM_XBUTTONDOWN => {
-            let llhs = &*(l_param as *const MSLLHOOKSTRUCT);
+            let llhs = &*(l_param.0 as *const MSLLHOOKSTRUCT);
 
             match HIWORD(llhs.mouseData) {
                 XBUTTON1 => Some(MouseButton::X1Button),
@@ -174,38 +200,38 @@ unsafe extern "system" fn mouse_proc(code: c_int, w_param: WPARAM, l_param: LPAR
                 Bind::Block(cb) => {
                     let cb = Arc::clone(cb);
                     spawn(move || cb());
-                    return 1;
+                    return LRESULT(1);
                 }
                 Bind::Blockable(cb) => {
                     if let BlockInput::Block = cb() {
-                        return 1;
+                        return LRESULT(1);
                     }
                 }
             }
         };
     }
-    CallNextHookEx(null_mut(), code, w_param, l_param)
+    CallNextHookEx(NULL_HHOOK, code, w_param, l_param)
 }
 
 fn set_hook(
-    hook_id: i32,
-    hook_ptr: &AtomicPtr<HHOOK__>,
+    hook_id: WINDOWS_HOOK_ID,
+    hook_ptr: &AtomicPtr<HHOOK>,
     hook_proc: unsafe extern "system" fn(c_int, WPARAM, LPARAM) -> LRESULT,
 ) {
     hook_ptr.store(
-        unsafe { SetWindowsHookExW(hook_id, Some(hook_proc), 0 as HINSTANCE, 0) },
+        unsafe { &mut SetWindowsHookExW(hook_id, Some(hook_proc), HINSTANCE(0), 0).unwrap() },
         Ordering::Relaxed,
     );
 }
 
-fn unset_hook(hook_ptr: &AtomicPtr<HHOOK__>) {
+fn unset_hook(hook_ptr: &AtomicPtr<HHOOK>) {
     if !hook_ptr.load(Ordering::Relaxed).is_null() {
-        unsafe { UnhookWindowsHookEx(hook_ptr.load(Ordering::Relaxed)) };
+        unsafe { UnhookWindowsHookEx(*hook_ptr.load(Ordering::Relaxed)).unwrap() };
         hook_ptr.store(null_mut(), Ordering::Relaxed);
     }
 }
 
-fn send_mouse_input(flags: u32, data: u32, dx: i32, dy: i32) {
+fn send_mouse_input(flags: MOUSE_EVENT_FLAGS, data: i32, dx: i32, dy: i32) {
     let mouse: MOUSEINPUT = MOUSEINPUT {
         dx,
         dy,
@@ -215,24 +241,22 @@ fn send_mouse_input(flags: u32, data: u32, dx: i32, dy: i32) {
         dwExtraInfo: 0,
     };
 
-    let mut input_u: INPUT_u = unsafe { std::mem::zeroed() };
+    let mut input_u: INPUT_0 = unsafe { std::mem::zeroed() };
 
-    unsafe {
-        *input_u.mi_mut() = mouse;
-    }
+    input_u.mi = mouse;
 
-    let mut input = INPUT {
-        type_: INPUT_MOUSE,
-        u: input_u,
+    let input = INPUT {
+        r#type: INPUT_MOUSE,
+        Anonymous: input_u,
     };
-    unsafe { SendInput(1, &mut input as LPINPUT, size_of::<INPUT>() as c_int) };
+    unsafe { SendInput(&[input], size_of::<INPUT>() as c_int) };
 }
 
-fn send_keybd_input(flags: u32, key_code: KeybdKey) {
+fn send_keybd_input(flags: KEYBD_EVENT_FLAGS, key_code: KeybdKey) {
     let keybd: KEYBDINPUT = unsafe {
         KEYBDINPUT {
-            wVk: 0,
-            wScan: MapVirtualKeyW(u64::from(key_code) as u32, 0) as u16,
+            wVk: VIRTUAL_KEY(0),
+            wScan: MapVirtualKeyW(u64::from(key_code) as u32, MAP_VIRTUAL_KEY_TYPE(0)) as u16,
             dwFlags: flags,
             time: 0,
             dwExtraInfo: 0,
@@ -240,16 +264,14 @@ fn send_keybd_input(flags: u32, key_code: KeybdKey) {
     };
 
     // We need an "empty" winapi struct to union-ize
-    let mut input_u: INPUT_u = unsafe { std::mem::zeroed() };
+    let mut input_u: INPUT_0 = unsafe { std::mem::zeroed() };
 
-    unsafe {
-        *input_u.ki_mut() = keybd;
-    }
+    input_u.ki = keybd;
 
-    let mut input = INPUT {
-        type_: INPUT_KEYBOARD,
-        u: input_u,
+    let input = INPUT {
+        r#type: INPUT_KEYBOARD,
+        Anonymous: input_u,
     };
 
-    unsafe { SendInput(1, &mut input as LPINPUT, size_of::<INPUT>() as c_int) };
+    unsafe { SendInput(&[input], size_of::<INPUT>() as c_int) };
 }
