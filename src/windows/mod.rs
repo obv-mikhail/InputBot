@@ -7,7 +7,7 @@ use std::{
     sync::atomic::AtomicPtr,
 };
 use windows::Win32::{
-    Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM},
+    Foundation::{LPARAM, LRESULT, WPARAM},
     UI::{
         Input::KeyboardAndMouse::{
             GetAsyncKeyState, GetKeyState, MapVirtualKeyW, SendInput, INPUT, INPUT_0,
@@ -27,9 +27,6 @@ use windows::Win32::{
 };
 
 mod inputs;
-
-// Null HHOOK for functions where it is ignored
-const NULL_HHOOK: HHOOK = HHOOK(0);
 
 static KEYBD_HHOOK: Lazy<AtomicPtr<HHOOK>> = Lazy::new(AtomicPtr::default);
 static MOUSE_HHOOK: Lazy<AtomicPtr<HHOOK>> = Lazy::new(AtomicPtr::default);
@@ -130,7 +127,7 @@ pub fn handle_input_events() {
         set_hook(WH_KEYBOARD_LL, &KEYBD_HHOOK, keybd_proc);
     };
     let mut msg: MSG = unsafe { MaybeUninit::zeroed().assume_init() };
-    unsafe { GetMessageW(&mut msg, HWND(0), 0, 0) };
+    unsafe { GetMessageW(&mut msg, None, 0, 0) };
 }
 
 unsafe extern "system" fn keybd_proc(code: c_int, w_param: WPARAM, l_param: LPARAM) -> LRESULT {
@@ -162,14 +159,14 @@ unsafe extern "system" fn keybd_proc(code: c_int, w_param: WPARAM, l_param: LPAR
             }
         }
     }
-    CallNextHookEx(NULL_HHOOK, code, w_param, l_param)
+    CallNextHookEx(None, code, w_param, l_param)
 }
 
 // Replacement for missing conversions in windows crate
 type DWORD = c_ulong;
 type WORD = c_ushort;
 
-fn HIWORD(l: DWORD) -> WORD {
+fn hiword(l: DWORD) -> WORD {
     ((l >> 16) & 0xffff) as WORD
 }
 
@@ -183,7 +180,7 @@ unsafe extern "system" fn mouse_proc(code: c_int, w_param: WPARAM, l_param: LPAR
         WM_XBUTTONDOWN => {
             let llhs = &*(l_param.0 as *const MSLLHOOKSTRUCT);
 
-            match HIWORD(llhs.mouseData) {
+            match hiword(llhs.mouseData) {
                 XBUTTON1 => Some(MouseButton::X1Button),
                 XBUTTON2 => Some(MouseButton::X2Button),
                 _ => None,
@@ -210,7 +207,7 @@ unsafe extern "system" fn mouse_proc(code: c_int, w_param: WPARAM, l_param: LPAR
             }
         };
     }
-    CallNextHookEx(NULL_HHOOK, code, w_param, l_param)
+    CallNextHookEx(None, code, w_param, l_param)
 }
 
 fn set_hook(
@@ -219,7 +216,7 @@ fn set_hook(
     hook_proc: unsafe extern "system" fn(c_int, WPARAM, LPARAM) -> LRESULT,
 ) {
     hook_ptr.store(
-        unsafe { &mut SetWindowsHookExW(hook_id, Some(hook_proc), HINSTANCE(0), 0).unwrap() },
+        unsafe { &mut SetWindowsHookExW(hook_id, Some(hook_proc), None, 0).unwrap() },
         Ordering::Relaxed,
     );
 }
