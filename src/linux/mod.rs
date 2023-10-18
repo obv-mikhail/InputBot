@@ -17,7 +17,7 @@ use nix::{
 use once_cell::sync::Lazy;
 use std::{
     mem::MaybeUninit,
-    os::unix::io::RawFd,
+    os::fd::{FromRawFd, IntoRawFd, OwnedFd},
     path::Path,
     ptr::null,
     sync::atomic::{AtomicBool, Ordering},
@@ -83,7 +83,7 @@ static SEND_DISPLAY: Lazy<AtomicPtr<Display>> = Lazy::new(|| {
 /// Can be called before using the fake device to prevent it from
 /// building when you first try to use it.
 pub fn init_device() {
-    FAKE_DEVICE.lock().unwrap();
+    drop(FAKE_DEVICE.lock().unwrap());
 }
 
 impl KeybdKey {
@@ -222,16 +222,16 @@ impl LibinputInterfaceRaw {
 }
 
 impl LibinputInterface for LibinputInterfaceRaw {
-    fn open_restricted(&mut self, path: &Path, flags: i32) -> std::result::Result<RawFd, i32> {
+    fn open_restricted(&mut self, path: &Path, flags: i32) -> std::result::Result<OwnedFd, i32> {
         if let Ok(fd) = open(path, OFlag::from_bits_truncate(flags), Mode::empty()) {
-            Ok(fd)
+            Ok(unsafe { OwnedFd::from_raw_fd(fd) })
         } else {
             Err(1)
         }
     }
 
-    fn close_restricted(&mut self, fd: RawFd) {
-        let _ = close(fd);
+    fn close_restricted(&mut self, fd: OwnedFd) {
+        let _ = close(fd.into_raw_fd());
     }
 }
 
@@ -271,8 +271,7 @@ fn handle_input_event(event: Event) {
                 if keyboard_key_event.key_state() == KeyState::Pressed {
                     KEY_STATES.lock().unwrap().insert(keybd_key, true);
 
-                    if let Some(Bind::Normal(cb)) = KEYBD_BINDS.lock().unwrap().get(&keybd_key)
-                    {
+                    if let Some(Bind::Normal(cb)) = KEYBD_BINDS.lock().unwrap().get(&keybd_key) {
                         let cb = Arc::clone(cb);
                         spawn(move || cb());
                     }
@@ -293,9 +292,7 @@ fn handle_input_event(event: Event) {
             } {
                 if button_event.button_state() == ButtonState::Pressed {
                     BUTTON_STATES.lock().unwrap().insert(mouse_button, true);
-                    if let Some(Bind::Normal(cb)) =
-                        MOUSE_BINDS.lock().unwrap().get(&mouse_button)
-                    {
+                    if let Some(Bind::Normal(cb)) = MOUSE_BINDS.lock().unwrap().get(&mouse_button) {
                         let cb = Arc::clone(cb);
                         spawn(move || cb());
                     };
