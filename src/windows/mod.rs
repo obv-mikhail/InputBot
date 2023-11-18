@@ -21,7 +21,7 @@ use windows::Win32::{
             CallNextHookEx, GetCursorPos, GetMessageW, SetCursorPos, SetWindowsHookExW,
             UnhookWindowsHookEx, HHOOK, KBDLLHOOKSTRUCT, MSG, MSLLHOOKSTRUCT, WH_KEYBOARD_LL,
             WH_MOUSE_LL, WINDOWS_HOOK_ID, WM_KEYDOWN, WM_LBUTTONDOWN, WM_MBUTTONDOWN,
-            WM_RBUTTONDOWN, WM_SYSKEYDOWN, WM_XBUTTONDOWN, XBUTTON1, XBUTTON2,
+            WM_RBUTTONDOWN, WM_SYSKEYDOWN, WM_XBUTTONDOWN, XBUTTON1, XBUTTON2, SetTimer, KillTimer,
         },
     },
 };
@@ -126,8 +126,15 @@ pub fn handle_input_events() {
     if !KEYBD_BINDS.lock().unwrap().is_empty() {
         set_hook(WH_KEYBOARD_LL, &KEYBD_HHOOK, keybd_proc);
     };
-    let mut msg: MSG = unsafe { MaybeUninit::zeroed().assume_init() };
-    unsafe { GetMessageW(&mut msg, None, 0, 0) };
+
+    let timer_id = unsafe { SetTimer(None, 0, 100, None) };
+
+    while !MOUSE_BINDS.lock().unwrap().is_empty() || !KEYBD_BINDS.lock().unwrap().is_empty() {
+        let mut msg: MSG = unsafe { MaybeUninit::zeroed().assume_init() };
+        unsafe { GetMessageW(&mut msg, None, 0, 0) };
+    }
+
+    let _ = unsafe { KillTimer(None, timer_id) };
 }
 
 unsafe extern "system" fn keybd_proc(code: c_int, w_param: WPARAM, l_param: LPARAM) -> LRESULT {
