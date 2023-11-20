@@ -118,8 +118,8 @@ impl MouseWheel {
     }
 }
 
-/// Starts listening for bound input events.
-pub fn handle_input_events() {
+/// Starts listening for bound input events (otionally stopping when binds are removed).
+pub fn handle_input_events(auto_stop: bool) {
     if !MOUSE_BINDS.lock().unwrap().is_empty() {
         set_hook(WH_MOUSE_LL, &MOUSE_HHOOK, mouse_proc);
     };
@@ -129,7 +129,8 @@ pub fn handle_input_events() {
 
     let timer_id = unsafe { SetTimer(None, 0, 100, None) };
 
-    while !MOUSE_BINDS.lock().unwrap().is_empty() || !KEYBD_BINDS.lock().unwrap().is_empty() {
+    HANDLE_EVENTS.store(true, Ordering::Relaxed);
+    while should_continue(auto_stop) {
         let mut msg: MSG = unsafe { MaybeUninit::zeroed().assume_init() };
         unsafe { GetMessageW(&mut msg, None, 0, 0) };
     }

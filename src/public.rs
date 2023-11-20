@@ -546,3 +546,8 @@ impl KeySequence<'_> {
         }
     }
 }
+
+/// Stops `handle_input_events()` (threadsafe)
+pub fn stop_handling_input_events() {
+    HANDLE_EVENTS.store(false, Ordering::Relaxed);
+}
