@@ -1,7 +1,7 @@
 use crate::{common::*, public::*};
 use once_cell::sync::Lazy;
 use std::{
-    ffi::{c_int, c_ulong, c_ushort},
+    ffi::{c_int, c_ulong, c_ushort, c_short},
     mem::{size_of, MaybeUninit},
     ptr::null_mut,
     sync::atomic::AtomicPtr,
@@ -20,7 +20,7 @@ use windows::Win32::{
         WindowsAndMessaging::{
             CallNextHookEx, GetCursorPos, GetMessageW, SetCursorPos, SetWindowsHookExW,
             UnhookWindowsHookEx, HHOOK, KBDLLHOOKSTRUCT, MSG, MSLLHOOKSTRUCT, WH_KEYBOARD_LL,
-            WH_MOUSE_LL, WINDOWS_HOOK_ID, WM_KEYDOWN, WM_LBUTTONDOWN, WM_MBUTTONDOWN,
+            WH_MOUSE_LL, WINDOWS_HOOK_ID, WM_KEYDOWN, WM_LBUTTONDOWN, WM_MBUTTONDOWN, WM_MOUSEWHEEL,
             WM_RBUTTONDOWN, WM_SYSKEYDOWN, WM_XBUTTONDOWN, XBUTTON1, XBUTTON2, SetTimer, KillTimer,
         },
     },
@@ -177,6 +177,10 @@ fn hiword(l: DWORD) -> WORD {
     ((l >> 16) & 0xffff) as WORD
 }
 
+fn hiword_signed(l: DWORD) -> c_short {
+    ((l >> 16) & 0xffff) as c_short
+}
+
 unsafe extern "system" fn mouse_proc(code: c_int, w_param: WPARAM, l_param: LPARAM) -> LRESULT {
     if MOUSE_BINDS.lock().unwrap().is_empty() {
         unset_hook(&MOUSE_HHOOK);
@@ -191,6 +195,23 @@ unsafe extern "system" fn mouse_proc(code: c_int, w_param: WPARAM, l_param: LPAR
                 XBUTTON1 => Some(MouseButton::X1Button),
                 XBUTTON2 => Some(MouseButton::X2Button),
                 _ => None,
+            }
+        },
+        WM_MOUSEWHEEL => {
+            let llhs = &*(l_param.0 as *const MSLLHOOKSTRUCT);
+            let delta = hiword_signed(llhs.mouseData) ;
+            /*
+            "If the message is WM_MOUSEWHEEL, the high-order word of this member is the wheel delta.
+            The low-order word is reserved. A positive value indicates that the wheel was rotated
+            forward, away from the user; a negative value indicates that the wheel was rotated
+            backward, toward the user. One wheel click is defined as WHEEL_DELTA, which is 120."
+
+            In practice, the value received is always either 120 or -120.
+             */
+            if delta >= 0 {
+                Some(MouseButton::MousewheelUp)
+            } else {
+                Some(MouseButton::MousewheelDown)
             }
         }
         _ => None,

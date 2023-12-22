@@ -475,6 +475,8 @@ impl From<MouseButton> for uinput::event::controller::Mouse {
             MouseButton::LeftButton => Mouse::Left,
             MouseButton::RightButton => Mouse::Right,
             MouseButton::MiddleButton => Mouse::Middle,
+            MouseButton::MousewheelDown => unimplemented!(),
+            MouseButton::MousewheelUp => unimplemented!(),
             MouseButton::X1Button => unimplemented!(),
             MouseButton::X2Button => unimplemented!(),
             MouseButton::OtherButton(_) => unimplemented!(),
