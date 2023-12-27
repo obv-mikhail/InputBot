@@ -3,7 +3,7 @@ use once_cell::sync::Lazy;
 pub use std::{
     collections::hash_map::HashMap,
     sync::atomic::{AtomicPtr, Ordering},
-    sync::{Arc, Mutex},
+    sync::{atomic::AtomicBool, Arc, Mutex},
     thread::spawn,
 };
 
@@ -19,5 +19,13 @@ pub type BlockableHandler = Arc<dyn Fn() -> BlockInput + Send + Sync + 'static>;
 pub type KeybdBindMap = HashMap<KeybdKey, Bind>;
 pub type MouseBindMap = HashMap<MouseButton, Bind>;
 
+pub static HANDLE_EVENTS: AtomicBool = AtomicBool::new(false);
 pub static KEYBD_BINDS: Lazy<Mutex<KeybdBindMap>> = Lazy::new(|| Mutex::new(KeybdBindMap::new()));
 pub static MOUSE_BINDS: Lazy<Mutex<MouseBindMap>> = Lazy::new(|| Mutex::new(MouseBindMap::new()));
+
+pub fn should_continue(auto_stop: bool) -> bool {
+    HANDLE_EVENTS.load(Ordering::Relaxed)
+        && (!auto_stop
+            || !MOUSE_BINDS.lock().unwrap().is_empty()
+            || !KEYBD_BINDS.lock().unwrap().is_empty())
+}

@@ -39,7 +39,6 @@ type KeyStatesMap = HashMap<KeybdKey, bool>;
 
 static BUTTON_STATES: Lazy<Mutex<ButtonStatesMap>> =
     Lazy::new(|| Mutex::new(ButtonStatesMap::new()));
-static HANDLE_EVENTS: AtomicBool = AtomicBool::new(true);
 static KEY_STATES: Lazy<Mutex<KeyStatesMap>> = Lazy::new(|| Mutex::new(KeyStatesMap::new()));
 static FAKE_DEVICE: Lazy<Mutex<uinput::Device>> = Lazy::new(|| {
     Mutex::new(
@@ -235,17 +234,15 @@ impl LibinputInterface for LibinputInterfaceRaw {
     }
 }
 
-/// Starts listening for bound input events.
-pub fn handle_input_events() {
+/// Starts listening for bound input events (otionally stopping when binds are removed).
+pub fn handle_input_events(auto_stop: bool) {
     let mut libinput_context = Libinput::new_with_udev(LibinputInterfaceRaw);
     libinput_context
         .udev_assign_seat(&LibinputInterfaceRaw.seat())
         .unwrap();
 
-    while !MOUSE_BINDS.lock().unwrap().is_empty() || !KEYBD_BINDS.lock().unwrap().is_empty() {
-        if !HANDLE_EVENTS.load(Ordering::Relaxed) {
-            break;
-        }
+    HANDLE_EVENTS.store(true, Ordering::Relaxed);
+    while should_continue(auto_stop) {
         libinput_context.dispatch().unwrap();
 
         for event in libinput_context.by_ref() {
@@ -254,13 +251,6 @@ pub fn handle_input_events() {
 
         sleep(Duration::from_millis(10));
     }
-
-    HANDLE_EVENTS.store(true, Ordering::Relaxed);
-}
-
-/// Stops `handle_input_events()` using a thread safe AtomicBool
-pub fn stop_handling_input_events() {
-    HANDLE_EVENTS.store(false, Ordering::Relaxed);
 }
 
 fn handle_input_event(event: Event) {
