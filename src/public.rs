@@ -420,6 +420,13 @@ impl std::str::FromStr for KeybdKey {
         if let Some(k) = KEYBOARD_CANONICAL_NAMES_LOWER.get(&s_lower) {
             return Ok(*k);
         }
+        match s_lower.as_str() {
+            "leftwindows" => { return Ok(KeybdKey::LSuper)},
+            "leftcommand" => { return Ok(KeybdKey::LSuper)},
+            "rightwindows" => { return Ok(KeybdKey::RSuper)},
+            "rightcommand" => { return Ok(KeybdKey::RSuper)},
+            _ => {}
+        }
         if let Some(caps) = OTHER_KEY.captures(s) {
             let v = &caps[1]
                 .parse::<u64>()
