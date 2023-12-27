@@ -7,6 +7,8 @@
 - Many missing keys
 - Check if ScrollLock is toggled
 - `bind_all`
+- MousewheelUp and MousewheelDown
+- "serde" feature
 
 ## Changed
 

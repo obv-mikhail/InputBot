@@ -4,12 +4,56 @@ use std::{thread::sleep, time::Duration};
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
+#[cfg(feature = "serde")]
+use lazy_static::lazy_static;
+#[cfg(feature = "serde")]
+use regex::Regex;
+#[cfg(feature = "serde")]
+use serde::{
+    de::{Deserializer, Error},
+    Deserialize, Serialize,
+};
+#[cfg(feature = "serde")]
+use thiserror::Error;
+
 pub enum BlockInput {
     Block,
     DontBlock,
 }
 
+#[cfg(feature = "serde")]
+lazy_static! {
+    static ref OTHER_KEY: Regex = Regex::new(r"OtherKey(\d+)").unwrap();
+    static ref OTHER_MOUSE: Regex = Regex::new(r"MouseButton(\d+)").unwrap();
+    static ref KEYBOARD_CANONICAL_NAMES: HashMap<String, KeybdKey> = KeybdKey::iter()
+        .filter_map(|k| {
+            match k {
+                KeybdKey::OtherKey(_) => None,
+                _ => Some((k.canonical_name(), k)),
+            }
+        })
+        .collect();
+    static ref KEYBOARD_CANONICAL_NAMES_LOWER: HashMap<String, KeybdKey> = KEYBOARD_CANONICAL_NAMES
+        .iter()
+        .map(|(k, v)| (k.to_lowercase(), v.clone()))
+        .collect();
+    static ref MOUSE_CANONICAL_NAMES: HashMap<String, MouseButton> = MouseButton::iter()
+        .filter_map(|k| {
+            match k {
+                MouseButton::OtherButton(_) => None,
+                _ => Some((k.canonical_name(), k)),
+            }
+        })
+        .collect();
+    static ref MOUSE_CANONICAL_NAMES_LOWER: HashMap<String, MouseButton> = MOUSE_CANONICAL_NAMES
+        .iter()
+        .map(|(k, v)| (k.to_lowercase(), v.clone()))
+        .collect();
+}
+
 #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone, EnumIter)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
+
 pub enum KeybdKey {
     BackspaceKey,
     TabKey,
@@ -138,6 +182,7 @@ pub enum KeybdKey {
 }
 
 #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone, EnumIter)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 pub enum MouseButton {
     LeftButton,
     MiddleButton,
@@ -190,8 +235,21 @@ impl KeybdKey {
         }
     }
 
+    pub fn is_bound(self) -> bool {
+        KEYBD_BINDS.lock().unwrap().contains_key(&self)
+    }
+
     pub fn unbind(self) {
         KEYBD_BINDS.lock().unwrap().remove(&self);
+    }
+
+    // the canonical_name is guaranteed to roundtrip to and from the serialization format.
+    pub fn canonical_name(self) -> String {
+        match self {
+            KeybdKey::LSuper => "LeftSuper".to_owned(),
+            KeybdKey::RSuper => "RightSuper".to_owned(),
+            _ => format!("{}", self),
+        }
     }
 }
 
@@ -254,30 +312,30 @@ impl std::fmt::Display for KeybdKey {
                 KeybdKey::ZKey => "z",
                 KeybdKey::LSuper =>
                     if cfg!(target_os = "windows") {
-                        "Left Windows"
+                        "LeftWindows"
                     } else if cfg!(target_os = "macos") {
-                        "Left Command"
+                        "LeftCommand"
                     } else {
-                        "Left Super"
+                        "LeftSuper"
                     },
                 KeybdKey::RSuper =>
                     if cfg!(target_os = "windows") {
-                        "Right Windows"
+                        "RightWindows"
                     } else if cfg!(target_os = "macos") {
-                        "Right Command"
+                        "RightCommand"
                     } else {
-                        "Right Super"
+                        "RightSuper"
                     },
-                KeybdKey::Numpad0Key => "Number Pad 0",
-                KeybdKey::Numpad1Key => "Number Pad 1",
-                KeybdKey::Numpad2Key => "Number Pad 2",
-                KeybdKey::Numpad3Key => "Number Pad 3",
-                KeybdKey::Numpad4Key => "Number Pad 4",
-                KeybdKey::Numpad5Key => "Number Pad 5",
-                KeybdKey::Numpad6Key => "Number Pad 6",
-                KeybdKey::Numpad7Key => "Number Pad 7",
-                KeybdKey::Numpad8Key => "Number Pad 8",
-                KeybdKey::Numpad9Key => "Number Pad 9",
+                KeybdKey::Numpad0Key => "NumPad0",
+                KeybdKey::Numpad1Key => "NumPad1",
+                KeybdKey::Numpad2Key => "NumPad2",
+                KeybdKey::Numpad3Key => "NumPad3",
+                KeybdKey::Numpad4Key => "NumPad4",
+                KeybdKey::Numpad5Key => "NumPad5",
+                KeybdKey::Numpad6Key => "NumPad6",
+                KeybdKey::Numpad7Key => "NumPad7",
+                KeybdKey::Numpad8Key => "NumPad8",
+                KeybdKey::Numpad9Key => "NumPad9",
                 KeybdKey::F1Key => "F1",
                 KeybdKey::F2Key => "F2",
                 KeybdKey::F3Key => "F3",
@@ -302,25 +360,25 @@ impl std::fmt::Display for KeybdKey {
                 KeybdKey::F22Key => "F22",
                 KeybdKey::F23Key => "F23",
                 KeybdKey::F24Key => "F24",
-                KeybdKey::NumLockKey => "Number Lock",
-                KeybdKey::ScrollLockKey => "Scroll Lock",
-                KeybdKey::CapsLockKey => "Caps Lock",
-                KeybdKey::LShiftKey => "Left Shift",
-                KeybdKey::RShiftKey => "Right Shift",
-                KeybdKey::LControlKey => "Left Control",
-                KeybdKey::RControlKey => "Right Control",
-                KeybdKey::LAltKey => "Left Alt",
-                KeybdKey::RAltKey => "Right Alt",
+                KeybdKey::NumLockKey => "NumLock",
+                KeybdKey::ScrollLockKey => "ScrollLock",
+                KeybdKey::CapsLockKey => "CapsLock",
+                KeybdKey::LShiftKey => "LeftShift",
+                KeybdKey::RShiftKey => "RightShift",
+                KeybdKey::LControlKey => "LeftControl",
+                KeybdKey::RControlKey => "RightControl",
+                KeybdKey::LAltKey => "LeftAlt",
+                KeybdKey::RAltKey => "RightAlt",
                 KeybdKey::BrowserBackKey => "Back",
                 KeybdKey::BrowserForwardKey => "Forward",
                 KeybdKey::BrowserRefreshKey => "Refresh",
-                KeybdKey::VolumeMuteKey => "Volume Mute",
-                KeybdKey::VolumeDownKey => "Volume Down",
-                KeybdKey::VolumeUpKey => "Volume Up",
-                KeybdKey::MediaNextTrackKey => "Media Next",
-                KeybdKey::MediaPrevTrackKey => "Media Previous",
-                KeybdKey::MediaStopKey => "Media Stop",
-                KeybdKey::MediaPlayPauseKey => "Media Play",
+                KeybdKey::VolumeMuteKey => "VolumeMute",
+                KeybdKey::VolumeDownKey => "VolumeDown",
+                KeybdKey::VolumeUpKey => "VolumeUp",
+                KeybdKey::MediaNextTrackKey => "MediaNext",
+                KeybdKey::MediaPrevTrackKey => "MediaPrevious",
+                KeybdKey::MediaStopKey => "MediaStop",
+                KeybdKey::MediaPlayPauseKey => "MediaPlay",
                 KeybdKey::BackquoteKey => "Backquote",
                 KeybdKey::SlashKey => "Slash",
                 KeybdKey::BackslashKey => "Backslash",
@@ -329,12 +387,61 @@ impl std::fmt::Display for KeybdKey {
                 KeybdKey::MinusKey => "Minus",
                 KeybdKey::QuoteKey => "QuoteKey",
                 KeybdKey::SemicolonKey => "Semicolon",
-                KeybdKey::LBracketKey => "Left Bracket",
-                KeybdKey::RBracketKey => "Right Bracket",
+                KeybdKey::LBracketKey => "LeftBracket",
+                KeybdKey::RBracketKey => "RightBracket",
                 KeybdKey::EqualKey => "Equal",
-                KeybdKey::OtherKey(code) => return write!(f, "{code} Key"),
+                KeybdKey::OtherKey(code) => return write!(f, "OtherKey({code})"),
             }
         )
+    }
+}
+
+#[cfg(feature = "serde")]
+#[derive(Debug, Error)]
+pub enum ParseError {
+    #[error("Unable to parse the keycode value")]
+    ParseIntError {
+        #[from]
+        source: std::num::ParseIntError,
+        backtrace: std::backtrace::Backtrace,
+    },
+    #[error("Unknown format '{val}'")]
+    UnknownFormat {
+        val: String,
+        backtrace: std::backtrace::Backtrace,
+    },
+}
+
+#[cfg(feature = "serde")]
+impl std::str::FromStr for KeybdKey {
+    type Err = ParseError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let s_lower = s.to_lowercase();
+        if let Some(k) = KEYBOARD_CANONICAL_NAMES_LOWER.get(&s_lower) {
+            return Ok(*k);
+        }
+        if let Some(caps) = OTHER_KEY.captures(s) {
+            let v = &caps[1]
+                .parse::<u64>()
+                .map_err(|err| Into::<ParseError>::into(err))?;
+            return Ok(KeybdKey::OtherKey(*v));
+        }
+
+        Err(ParseError::UnknownFormat {
+            val: s.to_string(),
+            backtrace: std::backtrace::Backtrace::capture(),
+        })
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> Deserialize<'de> for KeybdKey {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        std::str::FromStr::from_str(&s).map_err(Error::custom)
     }
 }
 
@@ -374,8 +481,16 @@ impl MouseButton {
         }
     }
 
+    pub fn is_bound(self) -> bool {
+        MOUSE_BINDS.lock().unwrap().contains_key(&self)
+    }
+
     pub fn unbind(self) {
         MOUSE_BINDS.lock().unwrap().remove(&self);
+    }
+
+    pub fn canonical_name(self) -> String {
+        format!("{}", &self)
     }
 }
 
@@ -385,16 +500,49 @@ impl std::fmt::Display for MouseButton {
             f,
             "{}",
             match self {
-                MouseButton::LeftButton => "Left Click",
-                MouseButton::MiddleButton => "Middle Click",
+                MouseButton::LeftButton => "LeftClick",
+                MouseButton::MiddleButton => "MiddleClick",
                 MouseButton::RightButton => "Right Click",
                 MouseButton::X1Button => "Mouse Backward",
                 MouseButton::X2Button => "Mouse Forward",
                 MouseButton::OtherButton(code) => return write!(f, "{code} Click"),
                 MouseButton::MousewheelDown => "Mousewheel Down",
-                MouseButton::MousewheelUp => "Mousewheel Up"
+                MouseButton::MousewheelUp => "Mousewheel Up",
             }
         )
+    }
+}
+
+#[cfg(feature = "serde")]
+impl std::str::FromStr for MouseButton {
+    type Err = ParseError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let s_lower = s.to_lowercase();
+        if let Some(k) = MOUSE_CANONICAL_NAMES_LOWER.get(&s_lower) {
+            return Ok(*k);
+        }
+        if let Some(caps) = OTHER_KEY.captures(s) {
+            let v = &caps[1]
+                .parse::<u32>()
+                .map_err(|err| Into::<ParseError>::into(err))?;
+            return Ok(MouseButton::OtherButton(*v));
+        }
+
+        Err(ParseError::UnknownFormat {
+            val: s.to_string(),
+            backtrace: std::backtrace::Backtrace::capture(),
+        })
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> Deserialize<'de> for MouseButton {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        std::str::FromStr::from_str(&s).map_err(Error::custom)
     }
 }
 
