@@ -31,6 +31,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     // Call this to start listening for bound inputs.
-    inputbot::handle_input_events();
+    inputbot::handle_input_events(false);
     Ok(())
 }
