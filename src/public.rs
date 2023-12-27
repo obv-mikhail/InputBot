@@ -421,10 +421,10 @@ impl std::str::FromStr for KeybdKey {
             return Ok(*k);
         }
         match s_lower.as_str() {
-            "leftwindows" => { return Ok(KeybdKey::LSuper)},
-            "leftcommand" => { return Ok(KeybdKey::LSuper)},
-            "rightwindows" => { return Ok(KeybdKey::RSuper)},
-            "rightcommand" => { return Ok(KeybdKey::RSuper)},
+            "leftwindows" => return Ok(KeybdKey::LSuper),
+            "leftcommand" => return Ok(KeybdKey::LSuper),
+            "rightwindows" => return Ok(KeybdKey::RSuper),
+            "rightcommand" => return Ok(KeybdKey::RSuper),
             _ => {}
         }
         if let Some(caps) = OTHER_KEY.captures(s) {
@@ -509,12 +509,12 @@ impl std::fmt::Display for MouseButton {
             match self {
                 MouseButton::LeftButton => "LeftClick",
                 MouseButton::MiddleButton => "MiddleClick",
-                MouseButton::RightButton => "Right Click",
-                MouseButton::X1Button => "Mouse Backward",
-                MouseButton::X2Button => "Mouse Forward",
-                MouseButton::OtherButton(code) => return write!(f, "{code} Click"),
-                MouseButton::MousewheelDown => "Mousewheel Down",
-                MouseButton::MousewheelUp => "Mousewheel Up",
+                MouseButton::RightButton => "RightClick",
+                MouseButton::X1Button => "MouseBackward",
+                MouseButton::X2Button => "MouseForward",
+                MouseButton::OtherButton(code) => return write!(f, "MouseButton({code})"),
+                MouseButton::MousewheelDown => "MousewheelDown",
+                MouseButton::MousewheelUp => "MousewheelUp",
             }
         )
     }
@@ -708,4 +708,68 @@ impl KeySequence<'_> {
 /// Stops `handle_input_events()` (threadsafe)
 pub fn stop_handling_input_events() {
     HANDLE_EVENTS.store(false, Ordering::Relaxed);
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    #[cfg(feature = "serde")]
+    fn to_string_roundtrips() {
+        use std::{str::FromStr, collections::HashSet};
+        let serialized_keys : Vec<String> = KeybdKey::iter().map(|k| k.to_string()).collect();
+        let deserialized_keys : HashSet<KeybdKey> = serialized_keys.iter().map(|k| KeybdKey::from_str(k).unwrap()).collect();
+        for k in KeybdKey::iter() {
+            assert!(deserialized_keys.contains(&k));
+        }
+
+        let serialized_mouse : Vec<String> = MouseButton::iter().map(|b| b.to_string()).collect();
+        let deserialized_mouse : HashSet<MouseButton> = serialized_mouse.iter().map(|b| MouseButton::from_str(b).unwrap()).collect();
+        for b in MouseButton::iter() {
+            assert!(deserialized_mouse.contains(&b));
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn canonical_name_roundtrips() {
+        use std::{str::FromStr, collections::HashSet};
+        let serialized_keys : Vec<String> = KeybdKey::iter().map(|k| k.canonical_name()).collect();
+        let deserialized_keys : HashSet<KeybdKey> = serialized_keys.iter().map(|k| KeybdKey::from_str(k).unwrap()).collect();
+        for k in KeybdKey::iter() {
+            assert!(deserialized_keys.contains(&k));
+        }
+
+        let serialized_mouse : Vec<String> = MouseButton::iter().map(|b| b.canonical_name()).collect();
+        let deserialized_mouse : HashSet<MouseButton> = serialized_mouse.iter().map(|b| MouseButton::from_str(b).unwrap()).collect();
+        for b in MouseButton::iter() {
+            assert!(deserialized_mouse.contains(&b));
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn serialization_case_insensitive() {
+        use std::{str::FromStr, collections::HashSet};
+        let serialized_keys : Vec<String> = KeybdKey::iter().map(|k| k.canonical_name()).collect();
+        let serialized_keys_upper : Vec<String>  = serialized_keys.iter().map(|k| k.to_uppercase()).collect();
+        let serialized_keys_lower : Vec<String>  = serialized_keys.iter().map(|k| k.to_lowercase()).collect();
+        for serialization in vec![serialized_keys, serialized_keys_upper, serialized_keys_lower] {
+            let deserialized_keys : HashSet<KeybdKey> = serialization.iter().map(|k| KeybdKey::from_str(k).unwrap()).collect();
+            for k in KeybdKey::iter() {
+                assert!(deserialized_keys.contains(&k));
+            }
+        }
+
+        let serialized_mouse : Vec<String> = MouseButton::iter().map(|b| b.canonical_name()).collect();
+        let serialized_mouse_upper : Vec<String>  = serialized_mouse.iter().map(|k| k.to_uppercase()).collect();
+        let serialized_mouse_lower : Vec<String>  = serialized_mouse.iter().map(|k| k.to_uppercase()).collect();
+        for serialization in vec![serialized_mouse, serialized_mouse_upper, serialized_mouse_lower] {
+            let deserialized_mouse : HashSet<MouseButton> = serialization.iter().map(|b| MouseButton::from_str(b).unwrap()).collect();
+            for b in MouseButton::iter() {
+                assert!(deserialized_mouse.contains(&b));
+            }
+        }
+    }
 }
