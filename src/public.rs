@@ -5,8 +5,6 @@ use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
 #[cfg(feature = "serde")]
-use lazy_static::lazy_static;
-#[cfg(feature = "serde")]
 use regex::Regex;
 #[cfg(feature = "serde")]
 use serde::{
@@ -22,33 +20,75 @@ pub enum BlockInput {
 }
 
 #[cfg(feature = "serde")]
-lazy_static! {
-    static ref OTHER_KEY: Regex = Regex::new(r"OtherKey(\d+)").unwrap();
-    static ref OTHER_MOUSE: Regex = Regex::new(r"MouseButton(\d+)").unwrap();
-    static ref KEYBOARD_CANONICAL_NAMES: HashMap<String, KeybdKey> = KeybdKey::iter()
-        .filter_map(|k| {
-            match k {
+fn other_key_regex() -> &'static Regex {
+    use std::sync::OnceLock;
+
+    static OTHER_KEY: OnceLock<Regex> = OnceLock::new();
+    OTHER_KEY.get_or_init(|| Regex::new(r#"OtherKey\((\d+)\)"#).unwrap())
+}
+
+#[cfg(feature = "serde")]
+fn other_mouse_regex() -> &'static Regex {
+    use std::sync::OnceLock;
+
+    static OTHER_KEY: OnceLock<Regex> = OnceLock::new();
+    OTHER_KEY.get_or_init(|| Regex::new(r#"MouseButton\((\d+)\)"#).unwrap())
+}
+
+#[cfg(feature = "serde")]
+fn keyboard_canonical_names() -> &'static HashMap<String, KeybdKey> {
+    use std::sync::OnceLock;
+
+    static KEYBOARD_CANONICAL_NAMES: OnceLock<HashMap<String, KeybdKey>> = OnceLock::new();
+
+    KEYBOARD_CANONICAL_NAMES.get_or_init(|| {
+        KeybdKey::iter()
+            .filter_map(|k| match k {
                 KeybdKey::OtherKey(_) => None,
                 _ => Some((k.canonical_name(), k)),
-            }
-        })
-        .collect();
-    static ref KEYBOARD_CANONICAL_NAMES_LOWER: HashMap<String, KeybdKey> = KEYBOARD_CANONICAL_NAMES
-        .iter()
-        .map(|(k, v)| (k.to_lowercase(), v.clone()))
-        .collect();
-    static ref MOUSE_CANONICAL_NAMES: HashMap<String, MouseButton> = MouseButton::iter()
-        .filter_map(|k| {
-            match k {
+            })
+            .collect()
+    })
+}
+
+#[cfg(feature = "serde")]
+fn keyboard_canonical_names_lower() -> &'static HashMap<String, KeybdKey> {
+    use std::sync::OnceLock;
+    static KEYBOARD_CANONICAL_NAMES_LOWER: OnceLock<HashMap<String, KeybdKey>> = OnceLock::new();
+
+    KEYBOARD_CANONICAL_NAMES_LOWER.get_or_init(|| {
+        keyboard_canonical_names()
+            .iter()
+            .map(|(k, v)| (k.to_lowercase(), v.clone()))
+            .collect()
+    })
+}
+#[cfg(feature = "serde")]
+fn mouse_canonical_names() -> &'static HashMap<String, MouseButton> {
+    use std::sync::OnceLock;
+
+    static MOUSE_CANONICAL_NAMES: OnceLock<HashMap<String, MouseButton>> = OnceLock::new();
+    MOUSE_CANONICAL_NAMES.get_or_init(|| {
+        MouseButton::iter()
+            .filter_map(|k| match k {
                 MouseButton::OtherButton(_) => None,
                 _ => Some((k.canonical_name(), k)),
-            }
-        })
-        .collect();
-    static ref MOUSE_CANONICAL_NAMES_LOWER: HashMap<String, MouseButton> = MOUSE_CANONICAL_NAMES
-        .iter()
-        .map(|(k, v)| (k.to_lowercase(), v.clone()))
-        .collect();
+            })
+            .collect()
+    })
+}
+
+#[cfg(feature = "serde")]
+fn mouse_canonical_names_lower() -> &'static HashMap<String, MouseButton> {
+    use std::sync::OnceLock;
+
+    static MOUSE_CANONICAL_NAMES_LOWER: OnceLock<HashMap<String, MouseButton>> = OnceLock::new();
+    MOUSE_CANONICAL_NAMES_LOWER.get_or_init(|| {
+        mouse_canonical_names()
+            .iter()
+            .map(|(k, v)| (k.to_lowercase(), v.clone()))
+            .collect()
+    })
 }
 
 #[derive(Debug, Eq, PartialEq, Hash, Copy, Clone, EnumIter)]
@@ -417,7 +457,7 @@ impl std::str::FromStr for KeybdKey {
     type Err = ParseError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let s_lower = s.to_lowercase();
-        if let Some(k) = KEYBOARD_CANONICAL_NAMES_LOWER.get(&s_lower) {
+        if let Some(k) = keyboard_canonical_names_lower().get(&s_lower) {
             return Ok(*k);
         }
         match s_lower.as_str() {
@@ -427,7 +467,7 @@ impl std::str::FromStr for KeybdKey {
             "rightcommand" => return Ok(KeybdKey::RSuper),
             _ => {}
         }
-        if let Some(caps) = OTHER_KEY.captures(s) {
+        if let Some(caps) = other_key_regex().captures(s) {
             let v = &caps[1]
                 .parse::<u64>()
                 .map_err(|err| Into::<ParseError>::into(err))?;
@@ -525,10 +565,10 @@ impl std::str::FromStr for MouseButton {
     type Err = ParseError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let s_lower = s.to_lowercase();
-        if let Some(k) = MOUSE_CANONICAL_NAMES_LOWER.get(&s_lower) {
+        if let Some(k) = mouse_canonical_names_lower().get(&s_lower) {
             return Ok(*k);
         }
-        if let Some(caps) = OTHER_KEY.captures(s) {
+        if let Some(caps) = other_mouse_regex().captures(s) {
             let v = &caps[1]
                 .parse::<u32>()
                 .map_err(|err| Into::<ParseError>::into(err))?;
@@ -710,63 +750,122 @@ pub fn stop_handling_input_events() {
     HANDLE_EVENTS.store(false, Ordering::Relaxed);
 }
 
-
 #[cfg(test)]
 mod tests {
-    use super::*;
+
     #[test]
     #[cfg(feature = "serde")]
-    fn to_string_roundtrips() {
-        use std::{str::FromStr, collections::HashSet};
-        let serialized_keys : Vec<String> = KeybdKey::iter().map(|k| k.to_string()).collect();
-        let deserialized_keys : HashSet<KeybdKey> = serialized_keys.iter().map(|k| KeybdKey::from_str(k).unwrap()).collect();
+    fn to_string_roundtrips() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::{KeybdKey, MouseButton};
+        use std::{collections::HashSet, str::FromStr};
+
+        use strum::IntoEnumIterator;
+
+        let serialized_keys: Vec<String> = KeybdKey::iter().map(|k| k.to_string()).collect();
+        let deserialized_keys: HashSet<KeybdKey> = serialized_keys
+            .iter()
+            .map(|k| KeybdKey::from_str(k).unwrap())
+            .collect();
         for k in KeybdKey::iter() {
             assert!(deserialized_keys.contains(&k));
         }
 
-        let serialized_mouse : Vec<String> = MouseButton::iter().map(|b| b.to_string()).collect();
-        let deserialized_mouse : HashSet<MouseButton> = serialized_mouse.iter().map(|b| MouseButton::from_str(b).unwrap()).collect();
+        let other_key_string = KeybdKey::OtherKey(42).to_string();
+        let other_key = KeybdKey::from_str(&other_key_string)?;
+        assert!(other_key == KeybdKey::OtherKey(42));
+
+        let serialized_mouse: Vec<String> = MouseButton::iter().map(|b| b.to_string()).collect();
+        let deserialized_mouse: HashSet<MouseButton> = serialized_mouse
+            .iter()
+            .map(|b| MouseButton::from_str(b).unwrap())
+            .collect();
         for b in MouseButton::iter() {
             assert!(deserialized_mouse.contains(&b));
         }
+        let other_mouse_string = MouseButton::OtherButton(42).to_string();
+        let other_mouse = MouseButton::from_str(&other_mouse_string)?;
+        assert!(other_mouse == MouseButton::OtherButton(42));
+        Ok(())
     }
 
     #[test]
     #[cfg(feature = "serde")]
-    fn canonical_name_roundtrips() {
+    fn canonical_name_roundtrips() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::{KeybdKey, MouseButton};
         use std::{str::FromStr, collections::HashSet};
-        let serialized_keys : Vec<String> = KeybdKey::iter().map(|k| k.canonical_name()).collect();
-        let deserialized_keys : HashSet<KeybdKey> = serialized_keys.iter().map(|k| KeybdKey::from_str(k).unwrap()).collect();
+
+        use strum::IntoEnumIterator;
+
+        let serialized_keys: Vec<String> = KeybdKey::iter().map(|k| k.canonical_name()).collect();
+        let deserialized_keys: HashSet<KeybdKey> = serialized_keys
+            .iter()
+            .map(|k| KeybdKey::from_str(k).unwrap())
+            .collect();
         for k in KeybdKey::iter() {
             assert!(deserialized_keys.contains(&k));
         }
 
-        let serialized_mouse : Vec<String> = MouseButton::iter().map(|b| b.canonical_name()).collect();
-        let deserialized_mouse : HashSet<MouseButton> = serialized_mouse.iter().map(|b| MouseButton::from_str(b).unwrap()).collect();
+        let other_key_string = KeybdKey::OtherKey(42).canonical_name();
+        let other_key = KeybdKey::from_str(&other_key_string)?;
+        assert!(other_key == KeybdKey::OtherKey(42));
+
+        let serialized_mouse: Vec<String> =
+            MouseButton::iter().map(|b| b.canonical_name()).collect();
+        let deserialized_mouse: HashSet<MouseButton> = serialized_mouse
+            .iter()
+            .map(|b| MouseButton::from_str(b).unwrap())
+            .collect();
         for b in MouseButton::iter() {
             assert!(deserialized_mouse.contains(&b));
         }
+
+        let other_mouse_string = MouseButton::OtherButton(42).canonical_name();
+        let other_mouse = MouseButton::from_str(&other_mouse_string)?;
+        assert!(other_mouse == MouseButton::OtherButton(42));
+        Ok(())
     }
 
     #[test]
     #[cfg(feature = "serde")]
     fn serialization_case_insensitive() {
+        use crate::{KeybdKey, MouseButton};
         use std::{str::FromStr, collections::HashSet};
-        let serialized_keys : Vec<String> = KeybdKey::iter().map(|k| k.canonical_name()).collect();
-        let serialized_keys_upper : Vec<String>  = serialized_keys.iter().map(|k| k.to_uppercase()).collect();
-        let serialized_keys_lower : Vec<String>  = serialized_keys.iter().map(|k| k.to_lowercase()).collect();
-        for serialization in vec![serialized_keys, serialized_keys_upper, serialized_keys_lower] {
-            let deserialized_keys : HashSet<KeybdKey> = serialization.iter().map(|k| KeybdKey::from_str(k).unwrap()).collect();
+
+        use strum::IntoEnumIterator;
+        let serialized_keys: Vec<String> = KeybdKey::iter().map(|k| k.canonical_name()).collect();
+        let serialized_keys_upper: Vec<String> =
+            serialized_keys.iter().map(|k| k.to_uppercase()).collect();
+        let serialized_keys_lower: Vec<String> =
+            serialized_keys.iter().map(|k| k.to_lowercase()).collect();
+        for serialization in vec![
+            serialized_keys,
+            serialized_keys_upper,
+            serialized_keys_lower,
+        ] {
+            let deserialized_keys: HashSet<KeybdKey> = serialization
+                .iter()
+                .map(|k| KeybdKey::from_str(k).unwrap())
+                .collect();
             for k in KeybdKey::iter() {
                 assert!(deserialized_keys.contains(&k));
             }
         }
 
-        let serialized_mouse : Vec<String> = MouseButton::iter().map(|b| b.canonical_name()).collect();
-        let serialized_mouse_upper : Vec<String>  = serialized_mouse.iter().map(|k| k.to_uppercase()).collect();
-        let serialized_mouse_lower : Vec<String>  = serialized_mouse.iter().map(|k| k.to_uppercase()).collect();
-        for serialization in vec![serialized_mouse, serialized_mouse_upper, serialized_mouse_lower] {
-            let deserialized_mouse : HashSet<MouseButton> = serialization.iter().map(|b| MouseButton::from_str(b).unwrap()).collect();
+        let serialized_mouse: Vec<String> =
+            MouseButton::iter().map(|b| b.canonical_name()).collect();
+        let serialized_mouse_upper: Vec<String> =
+            serialized_mouse.iter().map(|k| k.to_uppercase()).collect();
+        let serialized_mouse_lower: Vec<String> =
+            serialized_mouse.iter().map(|k| k.to_uppercase()).collect();
+        for serialization in vec![
+            serialized_mouse,
+            serialized_mouse_upper,
+            serialized_mouse_lower,
+        ] {
+            let deserialized_mouse: HashSet<MouseButton> = serialization
+                .iter()
+                .map(|b| MouseButton::from_str(b).unwrap())
+                .collect();
             for b in MouseButton::iter() {
                 assert!(deserialized_mouse.contains(&b));
             }
