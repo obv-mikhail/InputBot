@@ -26,5 +26,5 @@ fn main() {
     });
 
     // Call this to start listening for bound inputs.
-    inputbot::handle_input_events();
+    inputbot::handle_input_events(false);
 }

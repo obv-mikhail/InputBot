@@ -1,4 +1,5 @@
 #![doc = include_str!("../README.md")]
+#![feature(error_generic_member_access)]
 
 mod common;
 
@@ -14,3 +15,4 @@ pub use crate::windows::*;
 mod linux;
 #[cfg(target_os = "linux")]
 pub use crate::linux::*;
+

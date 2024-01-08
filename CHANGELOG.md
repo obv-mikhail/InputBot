@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.7.0
+
+### Added
+
+- `serde` feature
+
 ## 0.6.0
 
 ### Added
@@ -7,6 +13,8 @@
 - Many missing keys
 - Check if ScrollLock is toggled
 - `bind_all`
+- `MousewheelUp` and `MousewheelDown`
+- `KeybdKey::is_bound` and `MouseButton::is_bound`
 
 ## Changed
 
