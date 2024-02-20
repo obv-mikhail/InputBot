@@ -247,6 +247,14 @@ impl KeybdKey {
             .insert(self, Bind::Normal(Arc::new(callback)));
     }
 
+    #[cfg(target_os = "windows")]
+    pub fn bind_release<F: Fn() + Send + Sync + 'static>(self, callback: F) {
+        KEYBD_RELEASE_BINDS
+            .lock()
+            .unwrap()
+            .insert(self, Bind::Release(Arc::new(callback)));
+    }
+
     pub fn block_bind<F: Fn() + Send + Sync + 'static>(self, callback: F) {
         KEYBD_BINDS
             .lock()
@@ -272,6 +280,21 @@ impl KeybdKey {
                 .lock()
                 .unwrap()
                 .insert(key, Bind::Normal(Arc::new(fire)));
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    pub fn bind_all_release<F: Fn(KeybdKey) + Send + Sync + Clone + 'static>(callback: F) {
+        for key in KeybdKey::iter() {
+            let callback = callback.clone();
+            let fire = move || {
+                callback(key);
+            };
+
+            KEYBD_RELEASE_BINDS
+                .lock()
+                .unwrap()
+                .insert(key, Bind::Release(Arc::new(fire)));
         }
     }
 
@@ -500,6 +523,14 @@ impl MouseButton {
             .insert(self, Bind::Normal(Arc::new(callback)));
     }
 
+    #[cfg(target_os = "windows")]
+    pub fn bind_release<F: Fn() + Send + Sync + 'static>(self, callback: F) {
+        MOUSE_RELEASE_BINDS
+            .lock()
+            .unwrap()
+            .insert(self, Bind::Release(Arc::new(callback)));
+    }
+
     pub fn block_bind<F: Fn() + Send + Sync + 'static>(self, callback: F) {
         MOUSE_BINDS
             .lock()
@@ -525,6 +556,21 @@ impl MouseButton {
                 .lock()
                 .unwrap()
                 .insert(btn, Bind::Normal(Arc::new(fire)));
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    pub fn bind_all_release<F: Fn(MouseButton) + Send + Sync + Clone + 'static>(callback: F) {
+        for btn in MouseButton::iter() {
+            let callback = callback.clone();
+            let fire = move || {
+                callback(btn);
+            };
+
+            MOUSE_RELEASE_BINDS
+                .lock()
+                .unwrap()
+                .insert(btn, Bind::Release(Arc::new(fire)));
         }
     }
 
@@ -792,7 +838,7 @@ mod tests {
     #[cfg(feature = "serde")]
     fn canonical_name_roundtrips() -> Result<(), Box<dyn std::error::Error>> {
         use crate::{KeybdKey, MouseButton};
-        use std::{str::FromStr, collections::HashSet};
+        use std::{collections::HashSet, str::FromStr};
 
         use strum::IntoEnumIterator;
 
@@ -829,7 +875,7 @@ mod tests {
     #[cfg(feature = "serde")]
     fn serialization_case_insensitive() {
         use crate::{KeybdKey, MouseButton};
-        use std::{str::FromStr, collections::HashSet};
+        use std::{collections::HashSet, str::FromStr};
 
         use strum::IntoEnumIterator;
         let serialized_keys: Vec<String> = KeybdKey::iter().map(|k| k.canonical_name()).collect();

@@ -12,9 +12,22 @@ fn main() {
         };
     });
 
+    // Bind all release keys to a common callback event (Windows only).
+    KeybdKey::bind_all_release(|event| {
+        match inputbot::from_keybd_key(event) {
+            Some(c) => println!("released {c}"),
+            None => println!("Unregistered Key"),
+        };
+    });
+
     // Bind all mouse buttons to a common callback event.
     MouseButton::bind_all(|event| {
         println!("{:?}", event);
+    });
+
+    // Bind all release mouse buttons to a common callback event (Windows only).
+    MouseButton::bind_all_release(|event| {
+        println!("released {:?}", event);
     });
 
     // Call this to start listening for bound inputs.

@@ -15,4 +15,3 @@ pub use crate::windows::*;
 mod linux;
 #[cfg(target_os = "linux")]
 pub use crate::linux::*;
-
