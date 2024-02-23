@@ -1,7 +1,7 @@
 use crate::{common::*, public::*};
 use once_cell::sync::Lazy;
 use std::{
-    ffi::{c_int, c_ulong, c_ushort, c_short},
+    ffi::{c_int, c_short, c_ulong, c_ushort},
     mem::{size_of, MaybeUninit},
     ptr::null_mut,
     sync::atomic::AtomicPtr,
@@ -18,10 +18,12 @@ use windows::Win32::{
             MOUSE_EVENT_FLAGS, VIRTUAL_KEY,
         },
         WindowsAndMessaging::{
-            CallNextHookEx, GetCursorPos, GetMessageW, SetCursorPos, SetWindowsHookExW,
-            UnhookWindowsHookEx, HHOOK, KBDLLHOOKSTRUCT, MSG, MSLLHOOKSTRUCT, WH_KEYBOARD_LL,
-            WH_MOUSE_LL, WINDOWS_HOOK_ID, WM_KEYDOWN, WM_LBUTTONDOWN, WM_MBUTTONDOWN, WM_MOUSEWHEEL,
-            WM_RBUTTONDOWN, WM_SYSKEYDOWN, WM_XBUTTONDOWN, XBUTTON1, XBUTTON2, SetTimer, KillTimer,
+            CallNextHookEx, GetCursorPos, GetMessageW, KillTimer, SetCursorPos, SetTimer,
+            SetWindowsHookExW, UnhookWindowsHookEx, HHOOK, KBDLLHOOKSTRUCT, MSG, MSLLHOOKSTRUCT,
+            WH_KEYBOARD_LL, WH_MOUSE_LL, WINDOWS_HOOK_ID, WM_KEYDOWN, WM_KEYUP, WM_LBUTTONDOWN,
+            WM_LBUTTONUP, WM_MBUTTONDOWN, WM_MBUTTONUP, WM_MOUSEWHEEL, WM_RBUTTONDOWN,
+            WM_RBUTTONUP, WM_SYSKEYDOWN, WM_SYSKEYUP, WM_XBUTTONDOWN, WM_XBUTTONUP, XBUTTON1,
+            XBUTTON2,
         },
     },
 };
@@ -154,6 +156,7 @@ unsafe extern "system" fn keybd_proc(code: c_int, w_param: WPARAM, l_param: LPAR
                     let cb = Arc::clone(cb);
                     spawn(move || cb());
                 }
+                Bind::Release(_) => {}
                 Bind::Block(cb) => {
                     let cb = Arc::clone(cb);
                     spawn(move || cb());
@@ -166,8 +169,24 @@ unsafe extern "system" fn keybd_proc(code: c_int, w_param: WPARAM, l_param: LPAR
                 }
             }
         }
+    } else if w_param.0 as u32 == WM_KEYUP || w_param.0 as u32 == WM_SYSKEYUP {
+        if let Some(bind) = KEYBD_RELEASE_BINDS
+            .lock()
+            .unwrap()
+            .get_mut(&KeybdKey::from(u64::from(
+                (*(l_param.0 as *const KBDLLHOOKSTRUCT)).vkCode,
+            )))
+        {
+            match bind {
+                Bind::Release(cb) => {
+                    let cb = Arc::clone(cb);
+                    spawn(move || cb());
+                }
+                Bind::Normal(_) | Bind::Block(_) | Bind::Blockable(_) => {}
+            }
+        }
     }
-    CallNextHookEx(None, code, w_param, l_param)
+    return CallNextHookEx(None, code, w_param, l_param);
 }
 
 // Replacement for missing conversions in windows crate
@@ -185,39 +204,18 @@ fn hiword_signed(l: DWORD) -> c_short {
 unsafe extern "system" fn mouse_proc(code: c_int, w_param: WPARAM, l_param: LPARAM) -> LRESULT {
     if MOUSE_BINDS.lock().unwrap().is_empty() {
         unset_hook(&MOUSE_HHOOK);
-    } else if let Some(event) = match w_param.0 as u32 {
-        WM_LBUTTONDOWN => Some(MouseButton::LeftButton),
-        WM_RBUTTONDOWN => Some(MouseButton::RightButton),
-        WM_MBUTTONDOWN => Some(MouseButton::MiddleButton),
-        WM_XBUTTONDOWN => {
-            let llhs = &*(l_param.0 as *const MSLLHOOKSTRUCT);
-
-            match hiword(llhs.mouseData) {
-                XBUTTON1 => Some(MouseButton::X1Button),
-                XBUTTON2 => Some(MouseButton::X2Button),
-                _ => None,
+    } else if let Some((event, key_up)) = identify_event(w_param, l_param) {
+        if key_up {
+            if let Some(bind) = MOUSE_RELEASE_BINDS.lock().unwrap().get_mut(&event) {
+                match bind {
+                    Bind::Release(cb) => {
+                        let cb = Arc::clone(cb);
+                        spawn(move || cb());
+                    }
+                    Bind::Normal(_) | Bind::Block(_) | Bind::Blockable(_) => {}
+                }
             }
-        },
-        WM_MOUSEWHEEL => {
-            let llhs = &*(l_param.0 as *const MSLLHOOKSTRUCT);
-            let delta = hiword_signed(llhs.mouseData) ;
-            /*
-            "If the message is WM_MOUSEWHEEL, the high-order word of this member is the wheel delta.
-            The low-order word is reserved. A positive value indicates that the wheel was rotated
-            forward, away from the user; a negative value indicates that the wheel was rotated
-            backward, toward the user. One wheel click is defined as WHEEL_DELTA, which is 120."
-
-            In practice, the value received is always either 120 or -120.
-             */
-            if delta >= 0 {
-                Some(MouseButton::MousewheelUp)
-            } else {
-                Some(MouseButton::MousewheelDown)
-            }
-        }
-        _ => None,
-    } {
-        if let Some(bind) = MOUSE_BINDS.lock().unwrap().get_mut(&event) {
+        } else if let Some(bind) = MOUSE_BINDS.lock().unwrap().get_mut(&event) {
             match bind {
                 Bind::Normal(cb) => {
                     let cb = Arc::clone(cb);
@@ -233,10 +231,52 @@ unsafe extern "system" fn mouse_proc(code: c_int, w_param: WPARAM, l_param: LPAR
                         return LRESULT(1);
                     }
                 }
+                Bind::Release(_) => {}
             }
         };
     }
-    CallNextHookEx(None, code, w_param, l_param)
+    return CallNextHookEx(None, code, w_param, l_param);
+
+    unsafe fn identify_event(w_param: WPARAM, l_param: LPARAM) -> Option<(MouseButton, bool)> {
+        match w_param.0 as u32 {
+            WM_LBUTTONDOWN | WM_LBUTTONUP => {
+                Some((MouseButton::LeftButton, w_param.0 as u32 == WM_LBUTTONUP))
+            }
+            WM_RBUTTONDOWN | WM_RBUTTONUP => {
+                Some((MouseButton::RightButton, w_param.0 as u32 == WM_RBUTTONUP))
+            }
+            WM_MBUTTONDOWN | WM_MBUTTONUP => {
+                Some((MouseButton::MiddleButton, w_param.0 as u32 == WM_MBUTTONUP))
+            }
+            WM_XBUTTONDOWN | WM_XBUTTONUP => {
+                let llhs = &*(l_param.0 as *const MSLLHOOKSTRUCT);
+
+                match hiword(llhs.mouseData) {
+                    XBUTTON1 => Some((MouseButton::X1Button, w_param.0 as u32 == WM_XBUTTONUP)),
+                    XBUTTON2 => Some((MouseButton::X2Button, w_param.0 as u32 == WM_XBUTTONUP)),
+                    _ => None,
+                }
+            }
+            WM_MOUSEWHEEL => {
+                let llhs = &*(l_param.0 as *const MSLLHOOKSTRUCT);
+                let delta = hiword_signed(llhs.mouseData);
+                /*
+                "If the message is WM_MOUSEWHEEL, the high-order word of this member is the wheel delta.
+                The low-order word is reserved. A positive value indicates that the wheel was rotated
+                forward, away from the user; a negative value indicates that the wheel was rotated
+                backward, toward the user. One wheel click is defined as WHEEL_DELTA, which is 120."
+
+                In practice, the value received is always either 120 or -120.
+                 */
+                if delta >= 0 {
+                    Some((MouseButton::MousewheelUp, false))
+                } else {
+                    Some((MouseButton::MousewheelDown, false))
+                }
+            }
+            _ => None,
+        }
+    }
 }
 
 fn set_hook(
