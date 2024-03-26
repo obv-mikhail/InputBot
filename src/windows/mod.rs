@@ -109,14 +109,24 @@ impl MouseCursor {
 }
 
 impl MouseWheel {
-    /// Scrolls the mouse wheel vertically by a given amount.
+    /// Scrolls the mouse wheel vertically by a given amount of "wheel clicks".
     pub fn scroll_ver(dwheel: i32) {
         send_mouse_input(MOUSEEVENTF_WHEEL, dwheel * 120, 0, 0);
     }
 
-    /// Scrolls the mouse wheel horizontally by a given amount.
+    /// Scrolls the mouse wheel horizontally by a given amount of "wheel clicks".
     pub fn scroll_hor(dwheel: i32) {
         send_mouse_input(MOUSEEVENTF_HWHEEL, dwheel * 120, 0, 0);
+    }
+
+    /// Scrolls the mouse wheel vertically by a given amount.
+    pub fn scroll_ver_unscaled(dwheel: i32) {
+        send_mouse_input(MOUSEEVENTF_WHEEL, dwheel, 0, 0);
+    }
+
+    /// Scrolls the mouse wheel horizontally by a given amount.
+    pub fn scroll_hor_unscaled(dwheel: i32) {
+        send_mouse_input(MOUSEEVENTF_HWHEEL, dwheel, 0, 0);
     }
 }
 
