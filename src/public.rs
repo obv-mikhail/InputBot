@@ -463,16 +463,18 @@ impl std::fmt::Display for KeybdKey {
 #[derive(Debug, Error)]
 pub enum ParseError {
     #[error("Unable to parse the keycode value")]
-    ParseIntError {
-        #[from]
-        source: std::num::ParseIntError,
-        backtrace: std::backtrace::Backtrace,
-    },
+    ParseIntError,
     #[error("Unknown format '{val}'")]
     UnknownFormat {
         val: String,
-        backtrace: std::backtrace::Backtrace,
     },
+}
+
+#[cfg(feature = "serde")]
+impl From<std::num::ParseIntError> for ParseError {
+    fn from(_: std::num::ParseIntError) -> Self {
+        return ParseError::ParseIntError
+    }
 }
 
 #[cfg(feature = "serde")]
@@ -498,8 +500,7 @@ impl std::str::FromStr for KeybdKey {
         }
 
         Err(ParseError::UnknownFormat {
-            val: s.to_string(),
-            backtrace: std::backtrace::Backtrace::capture(),
+            val: s.to_string()
         })
     }
 }
@@ -622,8 +623,7 @@ impl std::str::FromStr for MouseButton {
         }
 
         Err(ParseError::UnknownFormat {
-            val: s.to_string(),
-            backtrace: std::backtrace::Backtrace::capture(),
+            val: s.to_string()
         })
     }
 }
